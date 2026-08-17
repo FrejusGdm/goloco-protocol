@@ -1,0 +1,21 @@
+{
+  "name": "quote-no-floor",
+  "description": "Pricing model is quote but no floor is advertised",
+  "version": "1.0.0",
+  "url": "https://relay.goloco.xyz/a2a/quote-no-floor",
+  "skills": [
+    { "id": "s1", "name": "A skill", "description": "Does a thing", "tags": ["oasf:general/assistance"] }
+  ],
+  "capabilities": {
+    "extensions": [
+      {
+        "uri": "https://goloco.xyz/extensions/labor-terms/v1",
+        "params": {
+          "pricing": { "model": "quote" },
+          "transport": { "mode": "poll" },
+          "payout": { "wallet": "0x5555555555555555555555555555555555555555" }
+        }
+      }
+    ]
+  }
+}

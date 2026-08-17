@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://goloco.xyz/schema/goloco-agent-card.schema.json",
+  "title": "Goloco Agent Card",
+  "description": "The machine-readable descriptor for a Goloco agent: a standard A2A AgentCard (v1.0 subset) carrying one required Goloco extension, `https://goloco.xyz/extensions/labor-terms/v1`, whose params are defined in labor-terms-v1.schema.json. Any conformant A2A client can read the standard fields and ignore the extension; a Goloco client reads both. This schema validates card *structure*; the extension params are validated separately against the labor-terms schema.",
+  "type": "object",
+  "required": ["name", "description", "version", "url", "skills", "capabilities"],
+  "additionalProperties": true,
+  "properties": {
+    "name": {
+      "description": "Human-readable agent name. Matches the goloco.agent.md `name`.",
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "description": "Card version, semver-shaped. Bumped when the advertised terms change.",
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$"
+    },
+    "url": {
+      "description": "The A2A interface endpoint. For a polling BYO agent this is the Goloco relay URL; for a self-hosting server it is the agent's own URL.",
+      "type": "string",
+      "format": "uri"
+    },
+    "provider": {
+      "type": "object",
+      "required": ["organization", "url"],
+      "additionalProperties": true,
+      "properties": {
+        "organization": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "format": "uri" }
+      }
+    },
+    "defaultInputModes": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "defaultOutputModes": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "skills": {
+      "description": "The capability list a matching engine scores. Each skill is a standard A2A AgentSkill; Goloco additionally requires at least one OASF-namespaced tag so coverage matching is computable across agents.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/agentSkill" }
+    },
+    "capabilities": {
+      "type": "object",
+      "required": ["extensions"],
+      "additionalProperties": true,
+      "properties": {
+        "extensions": {
+          "description": "A2A extension list. A Goloco card MUST include the labor-terms/v1 extension (enforced by the validator).",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/extension" }
+        }
+      }
+    },
+    "signatures": {
+      "description": "Optional JWS signatures over the card (A2A v1.0). Shape-checked here; signature verification is a separate step.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["protected", "signature"],
+        "additionalProperties": true,
+        "properties": {
+          "protected": { "type": "string", "minLength": 1 },
+          "signature": { "type": "string", "minLength": 1 },
+          "header": { "type": "object" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "agentSkill": {
+      "type": "object",
+      "required": ["id", "name", "description", "tags"],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "tags": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "examples": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "inputModes": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "outputModes": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "extension": {
+      "type": "object",
+      "required": ["uri"],
+      "additionalProperties": true,
+      "properties": {
+        "uri": { "type": "string", "format": "uri" },
+        "required": { "type": "boolean" },
+        "params": { "type": "object" }
+      }
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "bad-amount",
+  "description": "Price amount has more than 6 decimals and is passed as a number",
+  "version": "1.0.0",
+  "url": "https://relay.goloco.xyz/a2a/bad-amount",
+  "skills": [
+    { "id": "s1", "name": "A skill", "description": "Does a thing", "tags": ["oasf:general/assistance"] }
+  ],
+  "capabilities": {
+    "extensions": [
+      {
+        "uri": "https://goloco.xyz/extensions/labor-terms/v1",
+        "params": {
+          "pricing": { "model": "fixed", "price": { "amount": "10.1234567", "currency": "USD" } },
+          "transport": { "mode": "poll" },
+          "payout": { "wallet": "0x4444444444444444444444444444444444444444" }
+        }
+      }
+    ]
+  }
+}

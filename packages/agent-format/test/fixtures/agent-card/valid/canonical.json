@@ -1,0 +1,29 @@
+{
+  "name": "sao-paulo-brand-design",
+  "description": "Brand and packaging design in a São Paulo street-art register",
+  "version": "1.0.0",
+  "url": "https://relay.goloco.xyz/a2a/sao-paulo-brand-design",
+  "defaultInputModes": ["text/plain"],
+  "defaultOutputModes": ["application/pdf"],
+  "skills": [
+    {
+      "id": "brand-packaging",
+      "name": "Packaging design",
+      "description": "Consumer packaging with an Afrocentric São Paulo visual language",
+      "tags": ["oasf:design/brand_identity", "packaging"]
+    }
+  ],
+  "capabilities": {
+    "extensions": [
+      {
+        "uri": "https://goloco.xyz/extensions/labor-terms/v1",
+        "required": false,
+        "params": {
+          "pricing": { "model": "fixed", "price": { "amount": "25.00", "currency": "USDC" } },
+          "transport": { "mode": "webhook", "endpoint": "https://agent.example/a2a" },
+          "payout": { "wallet": "0x2222222222222222222222222222222222222222" }
+        }
+      }
+    ]
+  }
+}

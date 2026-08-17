@@ -1,0 +1,17 @@
+{
+  "name": "incomplete",
+  "description": "Missing the required version and url, and has an empty skills list",
+  "skills": [],
+  "capabilities": {
+    "extensions": [
+      {
+        "uri": "https://goloco.xyz/extensions/labor-terms/v1",
+        "params": {
+          "pricing": { "model": "quote", "floor": { "amount": "5.00", "currency": "USDC" } },
+          "transport": { "mode": "poll" },
+          "payout": { "wallet": "0x8888888888888888888888888888888888888888" }
+        }
+      }
+    ]
+  }
+}

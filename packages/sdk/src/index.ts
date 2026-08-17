@@ -400,11 +400,13 @@ export class GolocoClient implements MarketplaceApi {
   private readonly apiVersion: string;
   private readonly idempotencyKeyFactory: () => string;
   private readonly maxRetries: number;
+  private readonly transport: ApiTransport;
 
   public constructor(
-    private readonly transport: ApiTransport,
+    transport: ApiTransport,
     options: GolocoClientOptions = {},
   ) {
+    this.transport = transport;
     this.apiVersion = options.apiVersion ?? DEFAULT_API_VERSION;
     this.idempotencyKeyFactory = options.idempotencyKeyFactory ?? defaultIdempotencyKey;
     this.maxRetries = options.maxRetries ?? 2;
@@ -669,11 +671,19 @@ export class GolocoClient implements MarketplaceApi {
 }
 
 export class FetchTransport implements ApiTransport {
+  private readonly baseURL: string;
+  private readonly apiKey?: string;
+  private readonly requestInit: RequestInit;
+
   public constructor(
-    private readonly baseURL: string,
-    private readonly apiKey?: string,
-    private readonly requestInit: RequestInit = {},
-  ) {}
+    baseURL: string,
+    apiKey?: string,
+    requestInit: RequestInit = {},
+  ) {
+    this.baseURL = baseURL;
+    this.apiKey = apiKey;
+    this.requestInit = requestInit;
+  }
 
   public async request<Result>(request: TransportRequest): Promise<Result> {
     let response: Response;

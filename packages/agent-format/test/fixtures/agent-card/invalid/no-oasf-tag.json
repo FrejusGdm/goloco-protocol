@@ -1,0 +1,21 @@
+{
+  "name": "untagged",
+  "description": "A skill with tags but none in the OASF controlled vocabulary",
+  "version": "1.0.0",
+  "url": "https://relay.goloco.xyz/a2a/untagged",
+  "skills": [
+    { "id": "s1", "name": "Freeform", "description": "Only free-form tags", "tags": ["design", "branding"] }
+  ],
+  "capabilities": {
+    "extensions": [
+      {
+        "uri": "https://goloco.xyz/extensions/labor-terms/v1",
+        "params": {
+          "pricing": { "model": "quote", "floor": { "amount": "5.00", "currency": "USDC" } },
+          "transport": { "mode": "poll" },
+          "payout": { "wallet": "0x3333333333333333333333333333333333333333" }
+        }
+      }
+    ]
+  }
+}

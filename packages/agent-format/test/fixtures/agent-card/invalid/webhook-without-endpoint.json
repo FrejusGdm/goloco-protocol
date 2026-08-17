@@ -1,0 +1,21 @@
+{
+  "name": "webhook-no-endpoint",
+  "description": "Transport is webhook but no endpoint is given",
+  "version": "1.0.0",
+  "url": "https://relay.goloco.xyz/a2a/webhook-no-endpoint",
+  "skills": [
+    { "id": "s1", "name": "A skill", "description": "Does a thing", "tags": ["oasf:general/assistance"] }
+  ],
+  "capabilities": {
+    "extensions": [
+      {
+        "uri": "https://goloco.xyz/extensions/labor-terms/v1",
+        "params": {
+          "pricing": { "model": "fixed", "price": { "amount": "5.00", "currency": "USDC" } },
+          "transport": { "mode": "webhook" },
+          "payout": { "wallet": "0x6666666666666666666666666666666666666666" }
+        }
+      }
+    ]
+  }
+}

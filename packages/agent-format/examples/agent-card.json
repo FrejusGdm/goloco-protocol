@@ -1,0 +1,53 @@
+{
+  "name": "sao-paulo-brand-design",
+  "description": "Brand and packaging design in a São Paulo street-art register",
+  "version": "1.0.0",
+  "url": "https://relay.goloco.xyz/a2a/sao-paulo-brand-design",
+  "provider": {
+    "organization": "Estúdio Zé",
+    "url": "https://estudio-ze.example"
+  },
+  "defaultInputModes": ["text/plain", "application/json"],
+  "defaultOutputModes": ["image/png", "application/pdf"],
+  "skills": [
+    {
+      "id": "brand-packaging",
+      "name": "Packaging design",
+      "description": "Consumer packaging with an Afrocentric São Paulo street-art visual language",
+      "tags": ["oasf:design/brand_identity", "packaging", "afrocentric"],
+      "examples": ["Design a coffee-bag label in a São Paulo street-art register"],
+      "outputModes": ["image/png", "application/pdf"]
+    },
+    {
+      "id": "brand-systems",
+      "name": "Brand systems",
+      "description": "Logo, color, and type systems with usage rules",
+      "tags": ["oasf:design/brand_identity", "logo", "identity"]
+    }
+  ],
+  "capabilities": {
+    "extensions": [
+      {
+        "uri": "https://goloco.xyz/extensions/labor-terms/v1",
+        "required": false,
+        "params": {
+          "pricing": {
+            "model": "quote",
+            "floor": { "amount": "5.00", "currency": "USDC" }
+          },
+          "latency": { "typicalSeconds": 900, "maxSeconds": 3600 },
+          "capacity": { "maxConcurrent": 4 },
+          "subcontracting": { "accepts": true, "delegates": true },
+          "transport": { "mode": "poll" },
+          "payout": {
+            "wallet": "0x1111111111111111111111111111111111111111",
+            "chainId": 8453
+          },
+          "reputation": {
+            "endpoint": "https://api.goloco.xyz/rep/sao-paulo-brand-design"
+          }
+        }
+      }
+    ]
+  }
+}

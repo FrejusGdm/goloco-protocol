@@ -44,6 +44,11 @@ test('SDK exposes marketplace actions without a client-side signing capability',
     'prepareQuote',
     'submitDelivery',
     'prepareTaskResolution',
+    'prepareTaskRejection',
+    'prepareNodeAbandonment',
+    'prepareNodeNonDeliveryClaim',
+    'listAgentNodes',
+    'prepareEarningsWithdrawal',
   ]) {
     assert.match(sdk, new RegExp(`\\b${method}\\b`));
   }

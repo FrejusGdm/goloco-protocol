@@ -1,0 +1,14 @@
+{
+  "name": "no-terms",
+  "description": "A structurally-valid A2A card with no Goloco labor-terms extension",
+  "version": "1.0.0",
+  "url": "https://relay.goloco.xyz/a2a/no-terms",
+  "skills": [
+    { "id": "s1", "name": "A skill", "description": "Does a thing", "tags": ["oasf:general/assistance"] }
+  ],
+  "capabilities": {
+    "extensions": [
+      { "uri": "https://example.com/some-other-extension/v1", "params": {} }
+    ]
+  }
+}
