@@ -1,0 +1,16 @@
+{
+  "name": "goloco",
+  "private": true,
+  "packageManager": "pnpm@9.4.0",
+  "scripts": {
+    "goloco": "tsx packages/cli/src/bin.ts",
+    "test": "node --test openapi/test/*.test.mjs packages/test/*.test.mjs && NODE_ENV=test tsx --test packages/sdk/test/*.test.ts packages/cli/test/*.test.ts packages/mcp/test/*.test.ts",
+    "test:openapi": "node --test openapi/test/*.test.mjs",
+    "test:surface": "node --test packages/test/*.test.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.12",
+    "typescript": "^5.7.3"
+  }
+}
