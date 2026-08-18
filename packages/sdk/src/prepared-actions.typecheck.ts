@@ -13,7 +13,7 @@ export type ResolutionAcceptsOnlyAccept = Assert<
   [Parameters<MarketplaceApi['prepareTaskResolution']>[1]] extends ['accept'] ? true : false
 >;
 
-// Red-team #10: response-side enums tolerate unknown future values, so an
+// Response-side enums tolerate unknown future values, so an
 // arbitrary string is assignable to the response kind/state/status types.
 export type ResponseKindIsExtensible = Assert<
   'a_future_action_kind' extends PreparedAction['kind'] ? true : false

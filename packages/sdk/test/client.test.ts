@@ -98,7 +98,7 @@ test('maps public task, quote, and delivery inputs to strict OpenAPI wire bodies
   assert.equal(transport.requests[0].headers['Goloco-Version'], '2026-08-16');
 });
 
-test('rejects a prepared action whose kind does not match the requested intent (red-team #2)', async () => {
+test('rejects a prepared action whose kind does not match the requested intent', async () => {
   const transport = new SpyTransport();
   transport.respondWith({
     kind: 'withdraw_earnings',
@@ -119,7 +119,7 @@ test('rejects a prepared action whose kind does not match the requested intent (
   );
 });
 
-test('decodes the verifiable PreparedAction envelope from the wire (red-team #2)', async () => {
+test('decodes the verifiable PreparedAction envelope from the wire', async () => {
   const transport = new SpyTransport();
   transport.respondWith({
     kind: 'fund_task',
@@ -148,7 +148,7 @@ test('decodes the verifiable PreparedAction envelope from the wire (red-team #2)
   assert.equal(action.requestDigest, '0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc');
 });
 
-test('prepares a quote-bound subcontract intent (red-team P0 #1)', async () => {
+test('prepares a quote-bound subcontract intent', async () => {
   const transport = new SpyTransport();
   transport.respondWith({
     kind: 'subcontract', payload: { request: 'opaque' },

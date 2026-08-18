@@ -1,6 +1,6 @@
-# M1 local quality gates
+# Local quality gates
 
-The M1 quality gate is intentionally reproducible from the checkout. Run it
+The quality gate is intentionally reproducible from the checkout. Run it
 only on a clean, committed contract revision; it creates disposable git
 worktrees under the operating system temporary directory and never deploys.
 
@@ -25,7 +25,7 @@ directory outside the source tree:
 HALMOS_BIN=/path/to/halmos \
 GAMBIT_BIN=/path/to/gambit \
 SOLC_BIN=/path/to/solc-0.8.28 \
-QUALITY_RESULTS_DIR=/private/tmp/goloco-m1-quality \
+QUALITY_RESULTS_DIR=/private/tmp/goloco-quality \
 packages/contracts/scripts/run-quality-gates.sh
 ```
 

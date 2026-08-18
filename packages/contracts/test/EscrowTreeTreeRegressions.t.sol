@@ -13,7 +13,7 @@ contract EscrowTreeTreeRegressionsTest is EscrowTreeScenario {
         _setUpScenario();
     }
 
-    function test_M1_01_releasedAncestorRefundRemainsPendingUntilRootResolves() public {
+    function test_01_releasedAncestorRefundRemainsPendingUntilRootResolves() public {
         EscrowTree tree = _fundedTree(bytes32("m1-01"));
         uint64 childId = _subcontract(
             tree,
@@ -54,7 +54,7 @@ contract EscrowTreeTreeRegressionsTest is EscrowTreeScenario {
         assertEq(usdc.balanceOf(address(0xA101)), ROOT_AMOUNT);
     }
 
-    function test_M1_02_rejectFreezesEveryDescendantActionAndLeavesBuyerWithdrawal() public {
+    function test_02_rejectFreezesEveryDescendantActionAndLeavesBuyerWithdrawal() public {
         EscrowTree tree = _fundedTree(bytes32("m1-02-reject"));
         uint64 childId = _subcontract(
             tree,
@@ -75,7 +75,7 @@ contract EscrowTreeTreeRegressionsTest is EscrowTreeScenario {
         assertEq(usdc.balanceOf(address(0xB0B0)), ROOT_AMOUNT);
     }
 
-    function test_M1_02_rootAbandonAndNonDeliveryAreSingleGrossRefunds() public {
+    function test_02_rootAbandonAndNonDeliveryAreSingleGrossRefunds() public {
         EscrowTree abandoned = _fundedTree(bytes32("m1-02-abandon"));
         uint64 abandonedChild = _subcontract(
             abandoned,
@@ -110,7 +110,7 @@ contract EscrowTreeTreeRegressionsTest is EscrowTreeScenario {
         assertEq(timedOut.claimableOf(buyer), ROOT_AMOUNT);
     }
 
-    function test_M1_02_refundGuardBlocksAuthorizedChildActionsThatWereOtherwiseEnabled() public {
+    function test_02_refundGuardBlocksAuthorizedChildActionsThatWereOtherwiseEnabled() public {
         EscrowTree acceptTree = _fundedTree(bytes32("freeze-accept"));
         uint64 acceptChild = _subcontract(
             acceptTree,
@@ -327,7 +327,7 @@ contract EscrowTreeTreeRegressionsTest is EscrowTreeScenario {
         assertEq(tree.pendingOf(rootWorker), 0);
     }
 
-    function test_M1_07_routesOnlyUnallocatedAndPaysExactlyOneRootAmountAfterRelease() public {
+    function test_07_routesOnlyUnallocatedAndPaysExactlyOneRootAmountAfterRelease() public {
         EscrowTree tree = _fundedTree(bytes32("m1-07-release"));
         uint64 childId = _subcontract(
             tree,
@@ -370,7 +370,7 @@ contract EscrowTreeTreeRegressionsTest is EscrowTreeScenario {
         assertEq(usdc.balanceOf(address(0xA401)) + usdc.balanceOf(address(0xA402)), ROOT_AMOUNT);
     }
 
-    function test_M1_07_pendingIsVoidedWhenRootRefunds() public {
+    function test_07_pendingIsVoidedWhenRootRefunds() public {
         EscrowTree tree = _fundedTree(bytes32("m1-07-refund"));
         uint64 childId = _subcontract(
             tree,

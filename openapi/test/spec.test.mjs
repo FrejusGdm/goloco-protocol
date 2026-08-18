@@ -119,7 +119,7 @@ test('exposes non-custodial buyer/worker intent endpoints returning only Prepare
   }
 });
 
-test('removes the legacy direct-commit routes that bypassed the prepared-action boundary (red-team P0 #1)', () => {
+test('removes the legacy direct-commit routes that bypassed the prepared-action boundary', () => {
   // POST /v1/tasks, POST /v1/tasks/{id}/selection, and the direct subcontract
   // route committed a resource without a wallet-reviewable action. They are gone.
   assert.equal(spec.paths['/v1/tasks'].post, undefined, 'no direct task-commit route');
@@ -139,7 +139,7 @@ test('removes the legacy direct-commit routes that bypassed the prepared-action 
   assert.equal(resolveResponse(subcontractIntent.responses['200']).content['application/json'].schema.$ref, '#/components/schemas/PreparedAction');
 });
 
-test('binds a verifiable outer envelope on PreparedAction (red-team #2)', () => {
+test('binds a verifiable outer envelope on PreparedAction', () => {
   const action = spec.components.schemas.PreparedAction;
   for (const field of ['action_id', 'kind', 'principal', 'chain_id', 'escrow_address', 'nonce', 'request_digest', 'payload', 'signing_url', 'expires_at']) {
     assert.ok(action.required.includes(field), `PreparedAction requires ${field}`);
@@ -151,7 +151,7 @@ test('binds a verifiable outer envelope on PreparedAction (red-team #2)', () => 
   assert.equal(action.properties.payload.additionalProperties, true);
 });
 
-test('models operation-level OAuth scopes for least privilege (red-team #3)', () => {
+test('models operation-level OAuth scopes for least privilege', () => {
   const scopes = spec.components.securitySchemes.OAuth2.flows.authorizationCode.scopes;
   assert.deepEqual(Object.keys(scopes).sort(), ['agent-owner', 'buyer', 'read', 'worker']);
 
@@ -174,7 +174,7 @@ test('models operation-level OAuth scopes for least privilege (red-team #3)', ()
   }
 });
 
-test('documents the idempotency-key namespace and >=128-bit entropy (red-team #5)', () => {
+test('documents the idempotency-key namespace and >=128-bit entropy', () => {
   const description = spec.components.parameters.IdempotencyKey.description;
   assert.match(description, /authenticated principal/i);
   assert.match(description, /operation id/i);
@@ -183,7 +183,7 @@ test('documents the idempotency-key namespace and >=128-bit entropy (red-team #5
   assert.match(description, /128/);
 });
 
-test('tightens MoneyInput and subcontract/quote constraints to protocol constants (red-team #6)', () => {
+test('tightens MoneyInput and subcontract/quote constraints to protocol constants', () => {
   const moneyInput = spec.components.schemas.MoneyInput;
   const positive = new RegExp(moneyInput.properties.amount.pattern);
   assert.equal(positive.test('0'), false, 'zero is rejected');

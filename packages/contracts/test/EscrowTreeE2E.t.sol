@@ -13,7 +13,7 @@ interface ICircleUSDC {
     function DOMAIN_SEPARATOR() external view returns (bytes32);
 }
 
-/// @notice Real-Circle-USDC fork proof pinned to contract revision 4799a6f.
+/// @notice Real-Circle-USDC fork proof pinned to the audited contract revision.
 /// @dev Set BASE_SEPOLIA_RPC to run this suite at the hard-coded finalized block.
 ///      It deliberately never imports EscrowTreeScenario or invokes vm.etch/mint.
 contract EscrowTreeE2ETest is TestBase {

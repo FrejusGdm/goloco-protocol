@@ -115,7 +115,7 @@ async function handleMcpRequest(
     });
     // Marketplace text is attacker-controlled; strip terminal/agent control
     // sequences and fence the serialized text as inert data before it reaches
-    // the calling agent's context (API red-team #9).
+    // the calling agent's context.
     const safeValue = sanitizeUntrusted(result.value);
     return Response.json({
       jsonrpc: '2.0',
@@ -143,7 +143,7 @@ async function handleMcpRequest(
 // Never reflect a raw upstream error body/reason into the agent context. Local
 // validation errors carry safe, generated messages (sanitized); every
 // upstream-derived error collapses to an allowlisted code and a fixed generic
-// reason (API red-team #9).
+// reason.
 const UPSTREAM_ERROR_TEXT: Record<string, string> = {
   authentication_error: 'Authentication failed.',
   permission_denied: 'Permission denied.',

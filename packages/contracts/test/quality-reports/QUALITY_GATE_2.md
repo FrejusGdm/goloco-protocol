@@ -1,6 +1,6 @@
-# M1 local quality-gate report — e5167cf
+# Local quality-gate report
 
-Revision: `e5167cfecd80dace4564a47eb01e663e6923f349`
+Revision: the audited contract revision.
 Scope: `EscrowTree.sol` and `EscrowTreeFactory.sol` only.
 Execution: local only; no deployment, push, or external state change.
 
@@ -13,8 +13,8 @@ Run from the repository root with the version- and checksum-pinned command in
 HALMOS_BIN=/path/to/halmos \
 GAMBIT_BIN=/path/to/gambit \
 SOLC_BIN=/path/to/solc-0.8.28 \
-QUALITY_RESULTS_DIR=/private/tmp/goloco-m1-quality \
-QUALITY_REVISION=e5167cfecd80dace4564a47eb01e663e6923f349 \
+QUALITY_RESULTS_DIR=/private/tmp/goloco-quality \
+QUALITY_REVISION=<audited-contract-revision> \
 packages/contracts/scripts/run-quality-gates.sh
 ```
 

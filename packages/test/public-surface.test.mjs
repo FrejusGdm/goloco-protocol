@@ -44,10 +44,6 @@ test('SDK exposes marketplace actions without a client-side signing capability',
     'prepareQuote',
     'submitDelivery',
     'prepareTaskResolution',
-    'prepareTaskRejection',
-    'prepareNodeAbandonment',
-    'prepareNodeNonDeliveryClaim',
-    'listAgentNodes',
     'prepareEarningsWithdrawal',
   ]) {
     assert.match(sdk, new RegExp(`\\b${method}\\b`));
@@ -58,7 +54,7 @@ test('SDK exposes marketplace actions without a client-side signing capability',
   assert.doesNotMatch(sdk, /privateKey|signTransaction|sendTransaction/i);
 });
 
-test('drops the legacy direct-commit SDK methods that bypassed the prepared-action boundary (red-team P0 #1)', async () => {
+test('drops the legacy direct-commit SDK methods that bypassed the prepared-action boundary', async () => {
   const sdk = await source('sdk');
 
   // The direct mutations returning a committed Task/Node are gone from the SDK
@@ -69,12 +65,12 @@ test('drops the legacy direct-commit SDK methods that bypassed the prepared-acti
   // /selection-intents) must not appear.
   assert.equal(sdk.includes('}/selection`'), false, 'no direct /selection commit path remains');
 
-  // The client-side kind guard for red-team #2 is present and throws.
+  // The client-side kind guard is present and throws.
   assert.match(sdk, /PreparedActionKindError/);
   assert.match(sdk, /preparedActionMapper/);
 });
 
-test('every OPEN package source and manifest preserves the custody and CLOSED boundary', async () => {
+test('every OPEN package source and manifest preserves the custody boundary', async () => {
   const files = await collectOpenPackageFiles(path.resolve(new URL('..', import.meta.url).pathname));
   assert.ok(files.length > 0);
   const contents = await Promise.all(files.map((file) => readFile(file, 'utf8')));

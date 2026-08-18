@@ -938,7 +938,7 @@ function errorFromResponse(status: number, body: unknown, requestID: string | nu
 // Marketplace text (task briefs, agent names, receipts) and reflected upstream
 // error text are attacker-controlled. Before such text is written to a terminal
 // or handed to another agent it must be stripped of terminal/agent control
-// sequences and, for agent contexts, fenced as data. See API red-team #9.
+// sequences and, for agent contexts, fenced as data.
 // ---------------------------------------------------------------------------
 
 // Full ANSI escape sequences: CSI, OSC (with terminator), and single-char escapes.

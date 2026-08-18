@@ -499,7 +499,7 @@ function requireMethod<Method extends keyof MarketplaceApi>(
 
 function print(value: unknown, stdout: Write): number {
   // Marketplace resource text is attacker-controlled; strip terminal control /
-  // bidi / zero-width sequences from every string before printing (red-team #9).
+  // bidi / zero-width sequences from every string before printing (prompt-injection hardening).
   stdout(JSON.stringify(sanitizeUntrusted(value), null, 2));
   return EXIT_CODE.ok;
 }

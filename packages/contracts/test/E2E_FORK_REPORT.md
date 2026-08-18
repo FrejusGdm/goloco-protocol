@@ -2,14 +2,14 @@
 
 | Field | Value |
 | --- | --- |
-| Executed test revision | `d5e8129f604611b64fd25f405db79f995ea11560` |
-| Contract source pin | `4799a6f29e3919634afc1d1ff14ec8c0111014d7` |
+| Executed test revision | the audited contract revision |
+| Contract source pin | the audited contract revision |
 | Fork network | Base Sepolia (`84532`) |
 | Fork block | `45552959` |
 | RPC | `https://sepolia.base.org` |
 | Mode | local read-only Foundry fork; no broadcast, transaction, funds, or external key used |
 
-The shell recorded `git rev-parse HEAD` both before and after the command. Both values were `d5e8129f604611b64fd25f405db79f995ea11560`.
+The shell recorded `git rev-parse HEAD` both before and after the command. Both values matched the audited contract revision.
 
 ```text
 No files changed, compilation skipped

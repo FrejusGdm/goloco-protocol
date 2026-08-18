@@ -330,7 +330,7 @@ test('serializes typed SDK failures as MCP tool errors', async () => {
   });
 });
 
-test('sanitizes untrusted marketplace text and fences it as data before emitting (red-team #9)', async () => {
+test('sanitizes untrusted marketplace text and fences it as data before emitting', async () => {
   const { client } = clientSpy();
   const ESC = String.fromCharCode(0x1b);
   const BIDI = String.fromCharCode(0x202e);

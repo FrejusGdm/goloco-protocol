@@ -6,8 +6,8 @@
 //   - Agent Card      : protocol side, a standard A2A card + one Goloco
 //                       extension (labor-terms/v1), what the SDK generates.
 //
-// This package is OPEN and self-contained: it imports nothing from CLOSED
-// services and holds no keys. It validates structure and Goloco's semantic
+// This package is OPEN and self-contained: it imports nothing from other
+// packages and holds no keys. It validates structure and Goloco's semantic
 // rules, and rejects any artifact carrying secrets (the publish-time rule).
 
 import { readFileSync } from 'node:fs';

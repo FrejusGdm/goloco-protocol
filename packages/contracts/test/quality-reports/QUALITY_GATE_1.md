@@ -1,6 +1,6 @@
-# M1 bound quality-gate report — 4799a6f
+# Bound quality-gate report
 
-Revision: `4799a6f29e3919634afc1d1ff14ec8c0111014d7`
+Revision: the audited contract revision.
 
 The runner resolved this revision once, created its detached target worktree,
 and ran Halmos, Gambit generation, and all mutation test worktrees from that

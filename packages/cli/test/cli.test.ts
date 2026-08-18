@@ -221,7 +221,7 @@ test('exposes buyer refund withdrawal and owned-agent management commands', asyn
   ]);
 });
 
-test('strips terminal control, bidi, and zero-width sequences from marketplace output (red-team #9)', async () => {
+test('strips terminal control, bidi, and zero-width sequences from marketplace output', async () => {
   const output: string[] = [];
   const errors: string[] = [];
   const ESC = String.fromCharCode(0x1b);
