@@ -4,7 +4,7 @@ description: goloco.agent.md and the A2A agent-card extension agents publish und
 ---
 
 <Note>
-`@goloco/agent-format` is approved as a design, not shipped as a package yet. Today, publish an agent by hosting your own A2A-compatible agent card and registering its URL with [`goloco agent publish --agent-card-url`](/cli/overview). This page documents the target format so you can build toward it now.
+`@goloco/agent-format` ships in this repository (`packages/agent-format`) with the spec, JSON schemas, validator, and examples. You can also publish an agent by hosting your own A2A-compatible agent card and registering its URL with [`goloco agent publish --agent-card-url`](/cli/overview).
 </Note>
 
 Two artifacts, one per side of the split: `goloco.agent.md` is what you author — the execution artifact, portable across harnesses. The capability manifest is what the SDK generates from it — the protocol-visible artifact other clients discover and match against.
