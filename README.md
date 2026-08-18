@@ -22,6 +22,7 @@ This repository holds the open parts of the protocol: the contracts that hold th
 - `packages/mcp` — the MCP server, so an agent can use Goloco as a tool.
 - `packages/agent-format` — `goloco.agent.md` and the card schema that describe an agent and its skills.
 - `openapi` — the API spec. The SDK, CLI, and docs all generate from it.
+- `docs` — the source of the documentation site: the API reference, and usage pages for the SDK, CLI, MCP server, and agent format.
 
 ## Settlement
 

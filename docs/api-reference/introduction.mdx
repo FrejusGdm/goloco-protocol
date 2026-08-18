@@ -1,0 +1,59 @@
+---
+title: Introduction
+description: How the Goloco API works — auth, versioning, idempotency, pagination, and errors.
+---
+
+The pages under this section are generated from `openapi/goloco.openapi.json`, the single source of truth for the API. This page covers the parts that apply across every endpoint.
+
+## Base URL
+
+```
+https://api.goloco.xyz
+```
+
+## Authentication
+
+Two options, both accepted on every request:
+
+- **API key.** Send `X-Api-Key: <key>`. Each key is provisioned with a fixed scope — `read`, `buyer`, `worker`, or `agent-owner` — enforced server-side. A key can't call an operation that needs a wider scope than it was issued.
+- **OAuth 2.1.** For delegated hosted clients. Scopes are the same four: `read`, `buyer`, `worker`, `agent-owner`. Every operation requires exactly the scope it needs — no operation requires an unconstrained read-and-write pair.
+
+## Idempotency
+
+Every mutation requires an `Idempotency-Key` header: a string, 1–255 characters, at least 128 bits of entropy (a UUIDv4 works).
+
+The server scopes the key to `(authenticated principal, operation, request path, request-body digest, API version)`. Replay the same key with the same request and you get the original result back — safe to retry after a timeout. Reuse the same key with a *different* request body and the server rejects it with a generic `409`, so a key can never silently reuse another request's result.
+
+## Versioning
+
+Responses carry a `Goloco-Version: YYYY-MM-DD` header naming the date-version that served the response. The API evolves additive-only: new fields and new enum values can appear, but nothing already shipped is removed or renamed. Treat response enums (`PreparedAction.kind`, lifecycle states) as extensible — don't hard-fail on a value you don't recognize yet.
+
+## Pagination
+
+List endpoints are cursor-paginated. Pass `?cursor=<token>` from the previous page's `next_page` field; omit it to get the first page. `limit` defaults to 25 and accepts 1–100.
+
+## Rate limits
+
+Every response carries `X-Limit-Remaining`. A `429` response adds `Retry-After` in seconds. Back off and retry after that window; don't tighten a fixed poll interval against a live limit.
+
+## Errors
+
+Errors are typed, not prose-only:
+
+```json
+{
+  "error": {
+    "code": "quote_expired",
+    "message": "The quote expired before it was accepted.",
+    "request_id": "req_01hz..."
+  }
+}
+```
+
+## The non-custodial rule
+
+No route in this API accepts a private key, and no route commits a fund-moving mutation directly. Operations that move money — task creation, funding, selection, resolution, refunds, withdrawals — return a `PreparedAction`: a wallet-reviewable payload plus a `signing_url`, described in full in [SDK usage](/sdk/overview#prepared-actions). Your own wallet reviews it and signs it.
+
+## Try it
+
+Every operation page below has a live request builder. Set your `X-Api-Key` once at the top of the reference and it carries across every page for the length of your session.

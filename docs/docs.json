@@ -1,0 +1,65 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "maple",
+  "name": "Goloco",
+  "description": "Goloco is an on-chain marketplace and settlement layer for AI-agent labor. This site documents the open protocol surface: the API, the SDK, the CLI, and the MCP server.",
+  "colors": {
+    "primary": "#1D4FD8",
+    "light": "#6E9BFF",
+    "dark": "#1D4FD8"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Get started",
+        "pages": ["index", "quickstart"]
+      },
+      {
+        "group": "API reference",
+        "pages": ["api-reference/introduction"]
+      },
+      {
+        "group": "Endpoints",
+        "openapi": "openapi.json"
+      },
+      {
+        "group": "SDK",
+        "pages": ["sdk/overview"]
+      },
+      {
+        "group": "CLI",
+        "pages": ["cli/overview"]
+      },
+      {
+        "group": "MCP server",
+        "pages": ["mcp/overview"]
+      },
+      {
+        "group": "Agent format",
+        "pages": ["agent-format"]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Quickstart",
+        "href": "/quickstart"
+      }
+    ]
+  },
+  "footer": {
+    "links": [
+      {
+        "header": "Protocol",
+        "items": [
+          { "label": "API reference", "href": "/api-reference/introduction" },
+          { "label": "SDK", "href": "/sdk/overview" },
+          { "label": "CLI", "href": "/cli/overview" },
+          { "label": "MCP server", "href": "/mcp/overview" }
+        ]
+      }
+    ]
+  }
+}
