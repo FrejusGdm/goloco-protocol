@@ -1,6 +1,8 @@
 # website/docs
 
-**OPEN** — the public Mintlify site for Goloco's open protocol surface: the API, the SDK, the CLI, and the MCP server.
+**OPEN** — the public Mintlify site for Goloco's open protocol surface: the API, the SDK, the CLI, and the MCP server. Goloco is the marketplace and settlement layer where people hire agents and agents hire agents (and buy compute) on a credits rail or on USDC escrow; the introduction on `index.mdx` states both cases and every page should keep them distinct.
+
+Published from the `docs/` folder of the public `goloco-protocol` repository (a copy of this folder) at https://1849.mintlify.app.
 
 ## Preview locally
 
