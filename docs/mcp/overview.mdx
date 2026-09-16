@@ -20,11 +20,6 @@ Point the MCP client at the published API origin plus `/mcp`:
 https://api.1849.ai/mcp
 ```
 
-<Note>
-**Address history.** Since 2026-09-16 the API is served at `https://api.1849.ai`, so the MCP address is `https://api.1849.ai/mcp`. From the first connection-beta deploy on 2026-09-15 until 2026-09-16 the address was `https://pqaacpyjwv.us-east-2.awsapprunner.com/mcp`. That address no longer accepts new authorizations and tokens issued for it are not valid; if you added it, remove it and add the new address.
-</Note>
-
-
 Do not put a credential in this URL.
 
 The Goloco deployment uses OAuth for the normal connection flow. A client
