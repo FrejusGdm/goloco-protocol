@@ -7,7 +7,7 @@ description: "@goloco/sdk — a typed TypeScript client for the Goloco API."
 
 It does not define a signer and does not accept wallet key material. Every wallet-affecting call returns a `PreparedAction`, whose `signing_url` hands approval to your own wallet.
 
-The operation contract lives in `openapi/goloco.openapi.json`. Edit that spec to change behavior — the generated client surface is not hand-edited.
+The operation contract lives in `openapi/goloco.openapi.json`. Edit that spec and run `pnpm sdk:generate` to change behavior — generated client regions are not hand-edited.
 
 ## Install
 
@@ -28,11 +28,11 @@ import { GolocoClient, FetchTransport } from '@goloco/sdk';
 ```ts
 import { GolocoClient, FetchTransport } from '@goloco/sdk';
 
-const transport = new FetchTransport('https://api.goloco.xyz', process.env.GOLOCO_API_KEY);
+const transport = new FetchTransport('https://api.1849.ai', process.env.GOLOCO_API_KEY);
 const client = new GolocoClient(transport);
 ```
 
-`FetchTransport` sets `X-Api-Key` and `Content-Type` for you. Swap it for your own `ApiTransport` implementation if you need a different HTTP stack, request signing, or a test double — the SDK depends only on the `ApiTransport` interface, not on `fetch` itself.
+The origin is supplied by the release owner. `FetchTransport` sets `X-Api-Key` and `Content-Type` for you. Swap it for your own `ApiTransport` implementation if you need a different HTTP stack, request signing, or a test double — the SDK depends only on the `ApiTransport` interface, not on `fetch` itself.
 
 ## Buyer flow
 
@@ -52,6 +52,14 @@ for (const task of page.items) {
 ```
 
 Buyer-side state changes all follow the same shape — `prepareTaskCreation`, `prepareTaskSelection`, `prepareTaskFunding`, `prepareTaskResolution`, `prepareTaskRejection`, and `prepareRefundWithdrawal` each return a `PreparedAction`. Task listing stays cursor-paginated through `listTasks`.
+
+Read the principal-bound settlement projection without preparing another wallet action:
+
+```ts
+const settlement = await client.actions.settlement(actionId);
+// prepared | submitted | included | confirmed | cancelled_preseal |
+// expired_preseal | reverted | reorged | funding_uncertain
+```
 
 ## Worker flow
 
@@ -130,3 +138,17 @@ Mutations carry a generated idempotency key by default (`options.idempotencyKeyF
 ## Sanitizing untrusted text
 
 Task briefs, agent names, and other user-authored strings can carry adversarial content headed back into an agent's context. The SDK exports `stripUnsafeText`, `sanitizeUntrusted`, and `fenceUntrusted` for hosts that render API responses back into a model prompt.
+
+## Canonical JSON
+
+The SDK is also the one place the API's wire literals live in code: `TASK_TIERS` and `V1_TASK_TIERS` (with the `TaskTier` and `V1TaskTier` types and the `isTaskTier`, `isV1TaskTier`, and `formatTaskTier` helpers), `MONEY_AMOUNT_PATTERN_SOURCE` and `isMoneyAmount` (a decimal USDC amount strictly greater than zero, the same rule the API enforces), and `KNOWN_PREPARED_ACTION_KINDS`. Validate against these instead of copying the literals.
+
+The SDK re-exports `canonicalize` from `@goloco/jcs`, Goloco's vendored copy of the RFC 8785 reference canonicalizer. Use it wherever you hash or sign JSON so your bytes match the server's:
+
+```ts
+import { canonicalize } from '@goloco/sdk';
+
+const canonical = canonicalize({ b: 1, a: 'x' }); // '{"a":"x","b":1}'
+```
+
+See [Canonical JSON](/jcs) for the rules the RFC guarantees and what the package refuses.

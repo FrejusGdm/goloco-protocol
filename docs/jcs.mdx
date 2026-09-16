@@ -1,0 +1,52 @@
+---
+title: Canonical JSON
+description: "@goloco/jcs — RFC 8785 canonicalization, so a hash or signature over JSON means the same thing everywhere."
+---
+
+When two parties hash or sign JSON, they must serialize it to the same bytes first. Plain `JSON.stringify` does not promise that: property order, whitespace, and number formatting can all differ between producers. [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785) (the JSON Canonicalization Scheme, JCS) fixes one serialization, and `@goloco/jcs` is Goloco's implementation of it.
+
+It is a vendored copy of the reference JavaScript implementation the RFC itself lists in Appendix G — the `canonicalize` npm package by two of the RFC's authors — pinned to version 4.0.0 and shipped with zero runtime dependencies. The package's `VENDORED.md` records the exact source, version, and integrity hash.
+
+## Install
+
+`@goloco/jcs` is not published to npm yet. Inside a Goloco source checkout it is a workspace package, so you can import it directly:
+
+```ts
+import { canonicalize } from '@goloco/jcs';
+```
+
+The SDK re-exports the same function, so this import is equivalent:
+
+```ts
+import { canonicalize } from '@goloco/sdk';
+```
+
+## Use
+
+```ts
+import { canonicalize } from '@goloco/jcs';
+
+const terms = { price: { amount: '20.00', currency: 'USDC' }, deadline: '2026-08-20T00:00:00Z' };
+const canonical = canonicalize(terms);
+// '{"deadline":"2026-08-20T00:00:00Z","price":{"amount":"20.00","currency":"USDC"}}'
+```
+
+Hash the UTF-8 bytes of the returned string. Do not parse and re-serialize it with anything else; the canonical text is the thing being hashed.
+
+`canonicalize(value: unknown): string | undefined` returns `undefined` only where `JSON.stringify` would (a top-level `undefined`, function, or symbol).
+
+## What the RFC guarantees
+
+- **No whitespace** between tokens.
+- **Property names sorted** by UTF-16 code unit, recursively, including objects nested in arrays. Array element order is never changed.
+- **Numbers** in ECMAScript `Number.prototype.toString` form: `1e+30`, `0.000001`, `9007199254740992`. `-0` serializes as `0`.
+- **Strings** escaped one way: `\b \t \n \f \r` for those five control characters, lowercase `\u00hh` for the other control characters, `\"` and `\\`, and every other code point literal (no `\/`, no `\uXXXX` for non-ASCII).
+- **Errors, not output**, for NaN, Infinity, lone surrogates, and circular structures. A compliant canonicalizer must refuse them, and this one throws.
+
+## Conformance
+
+The package's test suite runs the RFC author's published test vectors against the vendored copy, byte for byte, plus the RFC's Appendix B number table and its sorting sample. Every expectation comes from the RFC or its vectors, never from the serializer under test.
+
+## Where it is used
+
+`@goloco/jcs` is the only canonical-JSON entry point for new Goloco code. The terms-hashing pipeline (the hash a quote's `termsHash` refers to, see [SDK usage](/sdk/overview#worker-flow)) migrates onto it in a later change; until then, quote and funding flows keep their current serializer and this package is additive.

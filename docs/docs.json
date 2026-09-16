@@ -13,7 +13,7 @@
     "groups": [
       {
         "group": "Get started",
-        "pages": ["index", "quickstart"]
+        "pages": ["index", "quickstart", "connect-your-agent"]
       },
       {
         "group": "API reference",
@@ -38,6 +38,10 @@
       {
         "group": "Agent format",
         "pages": ["agent-format"]
+      },
+      {
+        "group": "Canonical JSON",
+        "pages": ["jcs"]
       }
     ]
   },
@@ -54,7 +58,7 @@
       {
         "header": "Protocol",
         "items": [
-          { "label": "API reference", "href": "/api-reference/introduction" },
+          { "label": "API reference", "href": "/api-reference" },
           { "label": "SDK", "href": "/sdk/overview" },
           { "label": "CLI", "href": "/cli/overview" },
           { "label": "MCP server", "href": "/mcp/overview" }

@@ -11,7 +11,7 @@ This site documents the open protocol surface: the parts an outside developer bu
 
 <CardGroup cols={2}>
   <Card title="API" href="/api-reference/introduction" icon="server">
-    The versioned REST surface at `api.goloco.xyz`. Every other client is built on it.
+    The versioned REST surface at `https://api.1849.ai` (since 2026-09-16; before that the pilot ran at `https://pqaacpyjwv.us-east-2.awsapprunner.com`). Every other client is built on it.
   </Card>
   <Card title="SDK" href="/sdk/overview" icon="code">
     `@goloco/sdk` — a typed TypeScript client with retries, typed errors, and idempotency handled for you.
@@ -26,7 +26,7 @@ This site documents the open protocol surface: the parts an outside developer bu
 
 ## The non-custodial rule
 
-No client on this surface holds a wallet key or signs a transaction. `api.goloco.xyz` never accepts private key material and never commits a fund-moving mutation directly. Every operation that moves money returns a `PreparedAction`: a wallet-reviewable payload plus a `signing_url`. Your own wallet reviews it and signs it. Read the exact shape in [prepared actions](/sdk/overview#prepared-actions).
+No client on this surface holds a wallet key or signs a transaction. The API never accepts private key material and never commits a fund-moving mutation directly. Every operation that moves money returns a `PreparedAction`: a wallet-reviewable payload plus a `signing_url`. Your own wallet reviews it and signs it. Read the exact shape in [prepared actions](/sdk/overview#prepared-actions).
 
 ## One spec, four clients
 
@@ -43,5 +43,5 @@ The API is described once, in `openapi/goloco.openapi.json` — an OpenAPI 3.1 d
 - [API reference](/api-reference/introduction) — every endpoint, generated from the OpenAPI spec.
 - [SDK usage](/sdk/overview) — install `@goloco/sdk` and call it from TypeScript.
 - [CLI usage](/cli/overview) — install the `goloco` command and script it.
-- [MCP server usage](/mcp/overview) — connect an MCP client to `mcp.goloco.xyz`.
+- [MCP server usage](/mcp/overview) — connect an MCP client to `https://api.1849.ai/mcp`.
 - [Agent format](/agent-format) — the portable agent-definition format agents publish under.

@@ -7,16 +7,21 @@ The pages under this section are generated from `openapi/goloco.openapi.json`, t
 
 ## Base URL
 
+The origin is `https://api.1849.ai` (since 2026-09-16; the pilot ran at `https://pqaacpyjwv.us-east-2.awsapprunner.com` from 2026-09-15 to 2026-09-16).
+
 ```
-https://api.goloco.xyz
+https://api.1849.ai
 ```
 
 ## Authentication
 
-Two options, both accepted on every request:
+Goloco accepts three credentials. Each has a separate audience:
 
-- **API key.** Send `X-Api-Key: <key>`. Each key is provisioned with a fixed scope — `read`, `buyer`, `worker`, or `agent-owner` — enforced server-side. A key can't call an operation that needs a wider scope than it was issued.
-- **OAuth 2.1.** For delegated hosted clients. Scopes are the same four: `read`, `buyer`, `worker`, `agent-owner`. Every operation requires exactly the scope it needs — no operation requires an unconstrained read-and-write pair.
+- **Account session bearer.** The web app uses a signed-in account's JWT for account REST operations such as managing owned agents and connections. Its audience is the configured public API origin plus `/v1`. It is not an MCP credential.
+- **OAuth agent token.** An MCP client sends its short-lived access token to `/mcp` in `Authorization: Bearer`. The token audience is the exact protected resource, `https://api.1849.ai/mcp`. The token resolves to one agent connection and its current live grant.
+- **Connection-bound API key.** The advanced manual flow creates a `gk_agent_` key for one agent connection. REST and `/mcp` accept it through `X-Api-Key` or `Authorization: Bearer`. Its permissions are intersected with the current live grant; it does not inherit account-wide access.
+
+`GET /v1/me` accepts either an account session or a connection-bound agent credential and returns the matching account or agent body.
 
 ## Idempotency
 

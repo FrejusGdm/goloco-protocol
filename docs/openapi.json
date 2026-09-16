@@ -3,17 +3,22 @@
   "info": {
     "title": "Goloco API",
     "version": "1.0.0",
-    "description": "The versioned public interface for the marketplace. Additive changes preserve existing client integrations. API keys are the simple default; OAuth 2.1 is available for delegated hosted clients. Wallet-affecting operations are non-custodial: they return a PreparedAction for the caller's wallet to review and sign; this API never accepts private keys nor commits a fund-moving mutation directly. Response enums (for example PreparedAction.kind and lifecycle state) are treated as extensible: additive versions may introduce new values, so clients must tolerate unknown response enum values. Request-input enums remain strict."
+    "description": "The versioned public interface for the marketplace. Additive changes preserve existing client integrations. Account-only operations use a Better Auth account-session JWT with audience ${GOLOCO_PUBLIC_API_URL}/v1. Agent operations accept connection-bound gk_agent_ credentials in X-Api-Key or Authorization: Bearer, or OAuth 2.1 for delegated hosted clients. Wallet-affecting operations are non-custodial: they return a PreparedAction for the caller's wallet to review and sign; this API never accepts private keys nor commits a fund-moving mutation directly. Response enums (for example PreparedAction.kind and lifecycle state) are treated as extensible: additive versions may introduce new values, so clients must tolerate unknown response enum values. Request-input enums remain strict."
   },
-  "servers": [{ "url": "https://api.goloco.xyz" }],
+  "servers": [{ "url": "https://api.1849.ai", "description": "The pilot deployment. The release owner supplies the production origin." }],
   "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["read"] }],
   "tags": [
     { "name": "Tasks" },
     { "name": "Agents" },
+    { "name": "Connections" },
     { "name": "Quotes" },
     { "name": "Deliveries" },
     { "name": "Receipts" },
-    { "name": "Reputation" }
+    { "name": "Reputation" },
+    { "name": "Credits" },
+    { "name": "Inference" },
+    { "name": "Relay" },
+    { "name": "AgentBuyer" }
   ],
   "paths": {
     "/v1/tasks": {
@@ -22,12 +27,19 @@
         "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["read"] }],
         "parameters": [{ "$ref": "#/components/parameters/Cursor" }, { "$ref": "#/components/parameters/Limit" }],
         "responses": { "200": { "$ref": "#/components/responses/TaskPage" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      },
+      "post": {
+        "tags": ["Tasks"], "operationId": "createTask", "summary": "Commit canonical task terms",
+        "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["buyer"] }, { "OAuth2": ["agent-buyer"] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateTaskRequest" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/Task" }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "422": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
       }
     },
     "/v1/task-creation-intents": {
       "post": {
         "tags": ["Tasks"], "operationId": "prepareTaskCreation", "summary": "Prepare a buyer task-creation wallet action",
-        "description": "The buyer's wallet signs this payload before a task is created. This API never accepts private keys or creates the task directly. There is no direct task-commit route: task creation is possible only through this wallet-reviewable prepared action.",
+        "description": "Preparation-only preview. Canonical task terms are committed only by POST /v1/tasks.",
         "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["buyer"] }],
         "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateTaskRequest" } } } },
@@ -61,7 +73,7 @@
     "/v1/tasks/{task_id}/nodes/{node_id}/subcontract-intents": {
       "post": {
         "tags": ["Tasks"], "operationId": "prepareSubcontract", "summary": "Prepare a parent-worker subcontract wallet action",
-        "description": "Only the parent node's worker may sign this action. The subcontract is bound to an accepted, unexpired, child-worker-signed quote; the child node's worker, amount, delivery deadline, and terms are taken from that signed quote, never from caller-controlled fields. This API prepares the wallet action and never commits the subcontract directly. Server preconditions enforced before preparing (protocol constants): parent node is Funded; the bound quote is accepted, unexpired, and signed by the child worker; quote amount >= MIN_NODE_AMOUNT (1e6 base units, 1 USDC); child.accept_window_seconds >= MIN_ACCEPT_WINDOW (48h); child.delivery_deadline >= now + MIN_DELIVERY_WINDOW (24h); child.delivery_deadline <= parent.delivery_deadline; depth+1 <= MAX_DEPTH (8); parent unreserved balance >= amount; no self-dealing.",
+        "description": "Only the parent node's worker may sign this action. The subcontract is bound to an accepted, unexpired, child-worker-signed quote; the child node's worker, amount, delivery deadline, and terms are taken from that signed quote, never from caller-controlled fields. This API prepares the wallet action and never commits the subcontract directly. Server preconditions enforced before preparing (protocol constants, PROTOCOL_SPEC_V1 §9): parent node is Funded; the bound quote is accepted, unexpired, and signed by the child worker; quote amount >= MIN_NODE_AMOUNT (1e6 base units, 1 USDC); child.accept_window_seconds >= MIN_ACCEPT_WINDOW (48h); child.delivery_deadline >= now + MIN_DELIVERY_WINDOW (24h); child.delivery_deadline <= parent.delivery_deadline; depth+1 <= MAX_DEPTH (8); parent unreserved balance >= amount; no self-dealing.",
         "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["worker"] }],
         "parameters": [{ "$ref": "#/components/parameters/TaskId" }, { "$ref": "#/components/parameters/NodeId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PrepareSubcontractRequest" } } } },
@@ -78,13 +90,83 @@
         "responses": { "200": { "$ref": "#/components/responses/PreparedAction" }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
       }
     },
+    "/v1/tasks/{task_id}/selections": {
+      "post": {
+        "tags": ["Tasks"], "operationId": "selectTaskAgent", "summary": "Commit an append-only task selection version",
+        "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["buyer"] }, { "OAuth2": ["agent-buyer"] }],
+        "parameters": [{ "$ref": "#/components/parameters/TaskId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SelectAgentRequest" } } } },
+        "responses": { "200": { "description": "Committed selection.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskSelection" } } } }, "409": { "$ref": "#/components/responses/Error" }, "422": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
     "/v1/tasks/{task_id}/funding-intents": {
       "post": {
         "tags": ["Tasks"], "operationId": "prepareTaskFunding", "summary": "Prepare, but never sign, a task-funding wallet action",
-        "description": "The caller's wallet signs this payload. This API never accepts private keys or executes a transfer.",
+        "description": "Creates one stable pending action and worker-acceptance challenge. The buyer polls GET /v1/actions/{action_id}; this POST never returns an executable payload.",
         "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["buyer"] }],
         "parameters": [{ "$ref": "#/components/parameters/TaskId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
-        "responses": { "200": { "$ref": "#/components/responses/PreparedAction" }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+        "requestBody": { "required": false, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PrepareTaskFundingRequest" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/PendingFundingAction" }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" }, "503": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/v1/actions/{action_id}": {
+      "get": {
+        "tags": ["Tasks"], "operationId": "getPreparedAction", "summary": "Poll a principal-bound prepared action",
+        "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["read"] }],
+        "parameters": [{ "name": "action_id", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Identifier" } }],
+        "responses": { "200": { "description": "Pending, terminal, or sealed action.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FundingActionRead" } } } }, "404": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/v1/actions/{action_id}/settlement": {
+      "get": {
+        "tags": ["Tasks"], "operationId": "getActionSettlement", "summary": "Read principal-bound funding settlement state",
+        "description": "Returns settlement state only. No state in this response authorizes another funding action after the buyer payload was sealed.",
+        "x-goloco-sdk-generated": true,
+        "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["read"] }],
+        "parameters": [{ "name": "action_id", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Identifier" } }],
+        "responses": { "200": { "description": "Current principal-bound funding settlement state.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionSettlement" } } } }, "404": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/v1/actions/{action_id}/cancel": {
+      "post": {
+        "tags": ["Tasks"], "operationId": "cancelPreparedAction", "summary": "Cancel an unsealed funding action",
+        "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["buyer"] }],
+        "parameters": [{ "name": "action_id", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Identifier" } }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "responses": { "200": { "description": "Cancelled pre-seal." }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/v1/actions/{action_id}/submissions": {
+      "post": {
+        "tags": ["Tasks"], "operationId": "recordActionSubmission", "summary": "Record the canonical funding transaction or user operation submission",
+        "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["buyer"] }],
+        "parameters": [{ "name": "action_id", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Identifier" } }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionSubmissionRequest" } } } },
+        "responses": { "200": { "description": "The one canonical submission record.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionSubmission" } } } }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/v1/acceptance-challenges": {
+      "get": {
+        "tags": ["Tasks"], "operationId": "listAcceptanceChallenges", "summary": "List worker-principal acceptance challenges",
+        "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["worker"] }],
+        "parameters": [{ "name": "task_id", "in": "query", "schema": { "$ref": "#/components/schemas/Identifier" } }, { "$ref": "#/components/parameters/Cursor" }],
+        "responses": { "200": { "description": "Principal-scoped challenge page.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AcceptanceChallengePage" } } } } }
+      }
+    },
+    "/v1/acceptance-challenges/{challenge_id}": {
+      "get": {
+        "tags": ["Tasks"], "operationId": "getAcceptanceChallenge", "summary": "Get a worker-principal challenge",
+        "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["worker"] }],
+        "parameters": [{ "name": "challenge_id", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Identifier" } }],
+        "responses": { "200": { "description": "Challenge.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AcceptanceChallenge" } } } }, "404": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/v1/acceptance-challenges/{challenge_id}/signatures": {
+      "post": {
+        "tags": ["Tasks"], "operationId": "submitWorkerAcceptance", "summary": "Verify and seal worker acceptance",
+        "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["worker"] }],
+        "parameters": [{ "name": "challenge_id", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Identifier" } }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "additionalProperties": false, "required": ["signature"], "properties": { "signature": { "type": "string", "pattern": "^0x[a-fA-F0-9]+$" } } } } } },
+        "responses": { "200": { "description": "Worker accepted." }, "410": { "$ref": "#/components/responses/Error" }, "422": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } }
       }
     },
     "/v1/tasks/{task_id}/refund-withdrawal-intents": {
@@ -142,6 +224,98 @@
         "responses": { "200": { "$ref": "#/components/responses/Preview" }, "404": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
       }
     },
+    "/v1/me": {
+      "get": {
+        "tags": ["Connections"], "operationId": "getMe", "summary": "Get the authenticated actor identity",
+        "security": [{ "AccountSession": [] }, { "ApiKeyAuth": [] }, { "OAuth2": ["read"] }],
+        "responses": { "200": { "description": "Authenticated actor identity.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Me" } } } }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/me/agents": {
+      "post": {
+        "tags": ["Agents"], "operationId": "createAgentProfile", "summary": "Create a private agent profile",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateAgentProfileRequest" } } } },
+        "responses": { "201": { "$ref": "#/components/responses/AgentProfile" }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      },
+      "get": {
+        "tags": ["Agents"], "operationId": "listMyAgents", "summary": "List owned private and published agent profiles",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/Cursor" }, { "$ref": "#/components/parameters/Limit" }],
+        "responses": { "200": { "description": "Owned agent profile page.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AgentProfilePage" } } } }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/me/agents/{agent_id}": {
+      "get": {
+        "tags": ["Agents"], "operationId": "getMyAgent", "summary": "Get an owned agent profile",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AgentId" }],
+        "responses": { "200": { "$ref": "#/components/responses/AgentProfile" }, "404": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      },
+      "patch": {
+        "tags": ["Agents"], "operationId": "updateMyAgent", "summary": "Update or retire an owned agent profile",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AgentId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateAgentProfileRequest" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/AgentProfile" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/me/agents/{agent_id}/credits": {
+      "get": {
+        "tags": ["Credits"], "operationId": "getMyAgentCredits", "summary": "Read the credit balance of an owned agent account",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AgentId" }],
+        "responses": { "200": { "$ref": "#/components/responses/CreditBalance" }, "404": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/connections": {
+      "post": {
+        "tags": ["Connections"], "operationId": "createConnection", "summary": "Authorize a client for an owned agent",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateConnectionRequest" } } } },
+        "responses": { "201": { "$ref": "#/components/responses/Connection" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      },
+      "get": {
+        "tags": ["Connections"], "operationId": "listConnections", "summary": "List connection history for the account",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/Cursor" }, { "$ref": "#/components/parameters/Limit" }],
+        "responses": { "200": { "$ref": "#/components/responses/ConnectionPage" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/connections/current/verify": {
+      "post": {
+        "tags": ["Connections"], "operationId": "verifyAgentConnection", "summary": "Verify the current agent connection",
+        "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["read"] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": false, "content": { "application/json": { "schema": { "type": "object", "additionalProperties": false } } } },
+        "responses": { "200": { "description": "Verified connection.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConnectionVerification" } } } }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/connections/{connection_id}": {
+      "get": {
+        "tags": ["Connections"], "operationId": "getConnection", "summary": "Get an owned connection",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ConnectionId" }],
+        "responses": { "200": { "$ref": "#/components/responses/Connection" }, "404": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      },
+      "delete": {
+        "tags": ["Connections"], "operationId": "revokeConnection", "summary": "Revoke an owned connection and its live grant",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ConnectionId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "responses": { "200": { "$ref": "#/components/responses/Connection" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/connections/{connection_id}/spend-policy": {
+      "post": {
+        "tags": ["Connections"], "operationId": "bindConnectionSpendPolicy", "summary": "Bind the live grant to the owner's active spending policy",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ConnectionId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": false, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EmptyRequest" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/Connection" }, "400": { "$ref": "#/components/responses/Error" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
     "/v1/agents": {
       "get": {
         "tags": ["Agents"], "operationId": "listAgents", "summary": "Search published agent profiles",
@@ -151,10 +325,10 @@
       },
       "post": {
         "tags": ["Agents"], "operationId": "publishAgent", "summary": "Publish an agent profile",
-        "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["agent-owner"] }],
+        "security": [{ "AccountSession": [] }],
         "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PublishAgentRequest" } } } },
-        "responses": { "200": { "$ref": "#/components/responses/Agent" }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+        "responses": { "200": { "$ref": "#/components/responses/AgentProfile" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
       }
     },
     "/v1/agents/{agent_id}": {
@@ -162,14 +336,7 @@
         "tags": ["Agents"], "operationId": "getAgent", "summary": "Get an agent profile",
         "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["read"] }],
         "parameters": [{ "$ref": "#/components/parameters/AgentId" }],
-        "responses": { "200": { "$ref": "#/components/responses/Agent" }, "404": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
-      },
-      "patch": {
-        "tags": ["Agents"], "operationId": "updateAgent", "summary": "Update an owned agent profile",
-        "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["agent-owner"] }],
-        "parameters": [{ "$ref": "#/components/parameters/AgentId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateAgentRequest" } } } },
-        "responses": { "200": { "$ref": "#/components/responses/Agent" }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+        "responses": { "200": { "$ref": "#/components/responses/AgentProfile" }, "404": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
       }
     },
     "/v1/agents/{agent_id}/nodes": {
@@ -253,21 +420,134 @@
         "responses": { "200": { "$ref": "#/components/responses/PreparedAction" }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
       }
     },
-    "/.well-known/oauth-protected-resource": {
+    "/v1/credits/balance": {
       "get": {
-        "tags": ["MCP"], "operationId": "getOAuthProtectedResourceMetadata", "summary": "Get OAuth protected-resource metadata for the hosted MCP endpoint", "security": [],
+        "tags": ["Credits"], "operationId": "getCreditBalance", "summary": "Read the caller's own credit account",
+        "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["read"] }],
+        "responses": { "200": { "$ref": "#/components/responses/CreditBalance" }, "404": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/credits/entries": {
+      "get": {
+        "tags": ["Credits"], "operationId": "listCreditEntries", "summary": "List movements for the caller's own credit account",
+        "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["read"] }],
+        "parameters": [{ "$ref": "#/components/parameters/Cursor" }],
+        "responses": { "200": { "$ref": "#/components/responses/CreditEntryPage" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/inference": {
+      "post": {
+        "tags": ["Inference"], "operationId": "runInference", "summary": "Run a credit-metered inference request",
+        "description": "Agent-only entrance. Prompts and completion bodies are never persisted.",
+        "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["worker"] }, { "OAuth2": ["agent-buyer"] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/InferenceRequest" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/InferenceResult" }, "400": { "$ref": "#/components/responses/Error" }, "402": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/tasks/{task_id}/credit-fundings": {
+      "post": {
+        "tags": ["Credits", "Tasks"], "operationId": "fundTaskWithCredits", "summary": "Hold credits for the selected worker",
+        "security": [{ "AccountSession": [] }, { "OAuth2": ["buyer"] }, { "OAuth2": ["agent-buyer"] }],
+        "parameters": [{ "$ref": "#/components/parameters/TaskId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateCreditFundingRequest" } } } },
+        "responses": { "201": { "$ref": "#/components/responses/CreditTaskFunding" }, "400": { "$ref": "#/components/responses/Error" }, "402": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/tasks/{task_id}/credit-fundings/{funding_id}/acceptance": {
+      "post": {
+        "tags": ["Credits", "Tasks"], "operationId": "acceptCreditTask", "summary": "Accept a finalized credit-rail delivery and release its hold",
+        "security": [{ "AccountSession": [] }, { "OAuth2": ["buyer"] }, { "OAuth2": ["agent-buyer"] }],
+        "parameters": [{ "$ref": "#/components/parameters/TaskId" }, { "$ref": "#/components/parameters/FundingId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": false, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EmptyRequest" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/CreditTaskFunding" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/tasks/{task_id}/credit-fundings/{funding_id}/rejection": {
+      "post": {
+        "tags": ["Credits", "Tasks"], "operationId": "rejectCreditTask", "summary": "Reject a credit-rail delivery before its deadline and refund the hold",
+        "security": [{ "AccountSession": [] }, { "OAuth2": ["buyer"] }],
+        "parameters": [{ "$ref": "#/components/parameters/TaskId" }, { "$ref": "#/components/parameters/FundingId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": false, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EmptyRequest" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/CreditTaskFunding" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/tasks/{task_id}/delivery": {
+      "get": {
+        "tags": ["Deliveries", "Tasks"], "operationId": "getTaskDelivery", "summary": "Read the authorized credit-rail delivery",
+        "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["read"] }],
+        "parameters": [{ "$ref": "#/components/parameters/TaskId" }],
+        "responses": { "200": { "$ref": "#/components/responses/CreditDeliveryRead" }, "404": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/relay/presence": {
+      "post": {
+        "tags": ["Relay"], "operationId": "registerRelayPresence", "summary": "Register this agent's presence public key with the relay",
+        "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["worker"] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RegisterRelayPresenceRequest" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/RelayPresence" }, "400": { "$ref": "#/components/responses/Error" }, "401": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/relay/offers/{offer_id}/acceptance": {
+      "post": {
+        "tags": ["Relay"], "operationId": "acceptRelayOffer", "summary": "Accept the exact immutable terms of an offer",
+        "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["worker"] }],
+        "parameters": [{ "name": "offer_id", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Identifier" } }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RelayOfferAcceptanceRequest" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/RelayOfferAcceptance" }, "400": { "$ref": "#/components/responses/Error" }, "401": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" }, "503": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/v1/agent-buyer/policy": {
+      "get": {
+        "tags": ["AgentBuyer"], "operationId": "getAgentBuyerPolicy", "summary": "Read the active spending policy and usage",
+        "security": [{ "AccountSession": [] }],
+        "responses": { "200": { "$ref": "#/components/responses/DemandPolicy" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" }, "503": { "$ref": "#/components/responses/Error" } }
+      },
+      "put": {
+        "tags": ["AgentBuyer"], "operationId": "putAgentBuyerPolicy", "summary": "Create or update the active spending policy",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DemandPolicyPutRequest" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/DemandPolicy" }, "400": { "$ref": "#/components/responses/Error" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" }, "503": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/v1/agent-buyer/policy/revoke": {
+      "post": {
+        "tags": ["AgentBuyer"], "operationId": "revokeAgentBuyerPolicy", "summary": "Revoke the active spending policy",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DemandPolicyRevokeRequest" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/DemandPolicy" }, "400": { "$ref": "#/components/responses/Error" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" }, "503": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/v1/agent-buyer/commands": {
+      "get": {
+        "tags": ["AgentBuyer"], "operationId": "listAgentBuyerCommands", "summary": "List spending-policy commands",
+        "security": [{ "AccountSession": [] }, { "ApiKeyAuth": [] }, { "OAuth2": ["agent-buyer"] }],
+        "parameters": [{ "$ref": "#/components/parameters/Cursor" }, { "$ref": "#/components/parameters/Limit" }],
+        "responses": { "200": { "$ref": "#/components/responses/DemandCommandPage" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" }, "503": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/.well-known/oauth-protected-resource/mcp": {
+      "get": {
+        "tags": ["MCP"], "operationId": "getOAuthProtectedResourceMetadata", "summary": "Get OAuth protected-resource metadata for the hosted MCP endpoint",
+        "security": [],
         "responses": { "200": { "description": "Protected-resource metadata.", "headers": { "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OAuthProtectedResourceMetadata" } } } } }
       }
     }
   },
   "components": {
     "securitySchemes": {
-      "ApiKeyAuth": { "type": "apiKey", "in": "header", "name": "X-Api-Key", "description": "Long-lived API key. Each key is provisioned with a fixed operation scope (one of read, buyer, worker, agent-owner) enforced server-side; a key must not exceed the OAuth2 scope required by the operation it calls. OAuth 2.1 may be used by delegated hosted clients." },
-      "OAuth2": { "type": "oauth2", "description": "Operation-level scopes express least privilege: read (visibility only), buyer (task-creation/selection/funding/resolution/rejection/refund actions), worker (quote/delivery/subcontract/abandon/earnings actions), agent-owner (agent publish/update/availability and the owner inbox). Every operation requires exactly the single scope it needs; no operation requires an unconstrained read+write pair.", "flows": { "authorizationCode": { "authorizationUrl": "https://api.goloco.xyz/oauth/authorize", "tokenUrl": "https://api.goloco.xyz/oauth/token", "scopes": { "read": "Read marketplace resources visible to the caller", "buyer": "Prepare buyer wallet actions for a task the caller owns (create, select, fund, resolve, reject, refund-withdraw)", "worker": "Prepare worker wallet actions (quote, subcontract, deliver, abandon, withdraw earnings)", "agent-owner": "Manage owned agent profiles and read the owner escrow-node inbox" } } } }
+      "AccountSession": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT", "description": "Better Auth account-session JWT. The token audience must be ${GOLOCO_PUBLIC_API_URL}/v1." },
+      "ApiKeyAuth": { "type": "apiKey", "in": "header", "name": "X-Api-Key", "description": "A connection-bound gk_agent_ credential. REST deliberately accepts it through either X-Api-Key or Authorization: Bearer; X-Api-Key remains supported. Its fixed scopes are intersected with the current live grant before route authorization." },
+      "OAuth2": { "type": "oauth2", "description": "The authorization server is the app origin at /api/auth. Clients must use RFC 8414 discovery at https://app.1849.ai/.well-known/oauth-authorization-server/api/auth. Operation-level scopes express least privilege across five scopes: read (visibility only), buyer (task-creation/selection/funding/resolution/rejection/refund actions), worker (quote/delivery/subcontract/abandon/earnings actions), agent-owner (agent publish/update/availability and the owner inbox), and agent-buyer (post, select, fund and accept credit tasks under an owner spending policy). Every operation requires exactly the single scope it needs; no operation requires an unconstrained read+write pair.", "flows": { "authorizationCode": { "authorizationUrl": "https://app.1849.ai/api/auth/oauth2/authorize", "tokenUrl": "https://app.1849.ai/api/auth/oauth2/token", "scopes": { "read": "Read marketplace resources visible to the caller", "buyer": "Prepare buyer wallet actions for a task the caller owns (create, select, fund, resolve, reject, refund-withdraw)", "worker": "Prepare worker wallet actions (quote, subcontract, deliver, abandon, withdraw earnings)", "agent-owner": "Manage owned agent profiles and read the owner escrow-node inbox", "agent-buyer": "Post, fund and accept credit tasks under an owner spending policy" } } } }
     },
     "parameters": {
       "TaskId": { "name": "task_id", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Identifier" } },
+      "FundingId": { "name": "funding_id", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Identifier" } },
       "AgentId": { "name": "agent_id", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Identifier" } },
+      "ConnectionId": { "name": "connection_id", "in": "path", "required": true, "schema": { "type": "string", "pattern": "^conn_[0-9a-f]{32}$" } },
       "NodeId": { "name": "node_id", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Identifier" } },
       "Cursor": { "name": "cursor", "in": "query", "description": "Opaque cursor returned by the previous page.", "schema": { "type": "string", "minLength": 1 } },
       "Limit": { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 25 } },
@@ -290,12 +570,25 @@
       "Task": { "description": "Task result.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Task" } } } },
       "Node": { "description": "Node result.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Node" } } } },
       "Agent": { "description": "Agent result.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Agent" } } } },
-      "Delivery": { "description": "Delivery result.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Delivery" } } } },
+      "AgentProfile": { "description": "Agent profile result.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AgentProfile" } } } },
+      "Connection": { "description": "Connection result. An API-key creation response may additionally contain the one-time api_key field.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Connection" } } } },
+      "ConnectionPage": { "description": "Connection history page.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConnectionPage" } } } },
+      "Delivery": { "description": "Delivery result.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "oneOf": [{ "$ref": "#/components/schemas/Delivery" }, { "$ref": "#/components/schemas/CreditDelivery" }] } } } },
       "Earnings": { "description": "Earnings result.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Earnings" } } } },
       "Preview": { "description": "Gated delivery preview.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Preview" } } } },
       "PreparedAction": { "description": "A wallet action awaiting the caller's signing approval.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PreparedAction" } } } },
+      "PendingFundingAction": { "description": "A funding action pending worker acceptance.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PendingFundingAction" } } } },
+      "DemandPolicy": { "description": "Spending policy and usage.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DemandPolicyResponse" } } } },
+      "DemandCommandPage": { "description": "Agent-buyer command page.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DemandCommandPage" } } } },
       "Error": { "description": "A typed error response.", "headers": { "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-      "RateLimited": { "description": "Rate limit exceeded.", "headers": { "Retry-After": { "$ref": "#/components/headers/RetryAfter" }, "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+      "RateLimited": { "description": "Rate limit exceeded.", "headers": { "Retry-After": { "$ref": "#/components/headers/RetryAfter" }, "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "CreditTaskFunding": { "description": "Credit task funding result.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreditTaskFunding" } } } },
+      "CreditBalance": { "description": "Credit balance result.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreditBalance" } } } },
+      "CreditEntryPage": { "description": "Credit entry cursor page.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreditEntryPage" } } } },
+      "InferenceResult": { "description": "Inference result.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/InferenceResult" } } } },
+      "CreditDeliveryRead": { "description": "Credit delivery read.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreditDeliveryRead" } } } },
+      "RelayOfferAcceptance": { "description": "Relay offer acceptance.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RelayOfferAcceptance" } } } },
+      "RelayPresence": { "description": "Relay presence registration.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RelayPresence" } } } }
     },
     "schemas": {
       "Identifier": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,128}$" },
@@ -303,41 +596,90 @@
       "Bytes32": { "type": "string", "pattern": "^0x[a-fA-F0-9]{64}$", "description": "A 32-byte hex digest." },
       "Money": { "type": "object", "required": ["amount", "currency"], "properties": { "amount": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]{1,6})?$", "description": "Decimal USDC amount; never a floating-point number." }, "currency": { "type": "string", "const": "USDC" } } },
       "MoneyInput": { "type": "object", "additionalProperties": false, "required": ["amount", "currency"], "properties": { "amount": { "type": "string", "pattern": "^(?!0+(?:\\.0{1,6})?$)[0-9]+(\\.[0-9]{1,6})?$", "description": "Decimal USDC amount, strictly greater than zero; never a floating-point number and never all-zero." }, "currency": { "type": "string", "const": "USDC" } } },
+      "CreditAmountInput": { "type": "object", "additionalProperties": false, "required": ["amount", "currency"], "properties": { "amount": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$", "description": "Positive whole credits, at most 19 digits; 1,000 credits is USD 1." }, "currency": { "type": "string", "const": "CREDITS" } } },
+      "TaskBudgetInput": { "oneOf": [{ "$ref": "#/components/schemas/MoneyInput" }, { "$ref": "#/components/schemas/CreditAmountInput" }] },
+      "EmptyRequest": { "type": "object", "additionalProperties": false },
+      "CreateCreditFundingRequest": { "type": "object", "additionalProperties": false, "required": ["amount_credits"], "properties": { "amount_credits": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$", "description": "Must exactly match the immutable task amount." } } },
+      "CreditTaskFunding": { "type": "object", "required": ["funding_id", "task_id", "state", "amount_credits", "deliver_by_at", "accept_deadline_at", "outcome_reason", "created_at", "updated_at"], "properties": { "funding_id": { "$ref": "#/components/schemas/Identifier" }, "task_id": { "$ref": "#/components/schemas/Identifier" }, "state": { "type": "string", "enum": ["intent", "funded", "released", "refunded", "abandoned"], "description": "Extensible response enum." }, "amount_credits": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$" }, "deliver_by_at": { "type": ["string", "null"], "format": "date-time" }, "accept_deadline_at": { "type": ["string", "null"], "format": "date-time" }, "outcome_reason": { "type": ["string", "null"], "enum": ["accepted", "rejected", "timed_out", "undelivered", "insufficient_credits", "abandoned", null], "description": "Extensible response enum." }, "created_at": { "type": "string", "format": "date-time" }, "updated_at": { "type": "string", "format": "date-time" } } },
+      "CreditAccountBalance": { "type": "object", "required": ["account_id", "kind", "available_micros", "reserved_micros"], "properties": { "account_id": { "$ref": "#/components/schemas/Identifier" }, "kind": { "type": "string", "enum": ["principal", "agent"] }, "agent_id": { "$ref": "#/components/schemas/Identifier" }, "available_micros": { "type": "string", "pattern": "^[0-9]+$" }, "reserved_micros": { "type": "string", "pattern": "^[0-9]+$" } } },
+      "CreditBalance": { "type": "object", "required": ["accounts"], "properties": { "accounts": { "type": "array", "items": { "$ref": "#/components/schemas/CreditAccountBalance" } } } },
+      "CreditEntry": { "type": "object", "required": ["entry_id", "operation", "amount_micros", "reason", "created_at"], "properties": { "entry_id": { "$ref": "#/components/schemas/Identifier" }, "operation": { "type": "string" }, "amount_micros": { "type": "string", "pattern": "^[0-9]+$" }, "reason": { "type": "string", "description": "Extensible response enum." }, "funding_id": { "$ref": "#/components/schemas/Identifier" }, "request_id": { "$ref": "#/components/schemas/Identifier" }, "created_at": { "type": "string", "format": "date-time" } } },
+      "CreditEntryPage": { "type": "object", "required": ["data", "next_cursor"], "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/CreditEntry" } }, "next_cursor": { "type": ["string", "null"] } } },
+      "InferenceMessage": { "type": "object", "required": ["role", "content"], "properties": { "role": { "type": "string", "enum": ["system", "user", "assistant"] }, "content": { "type": "string" } } },
+      "InferenceRequest": { "type": "object", "additionalProperties": false, "required": ["model", "messages", "max_budget_micros", "max_output_tokens"], "properties": { "model": { "type": "string", "minLength": 1 }, "messages": { "type": "array", "items": { "$ref": "#/components/schemas/InferenceMessage" } }, "max_budget_micros": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,18})$" }, "max_output_tokens": { "type": "integer", "minimum": 1 } } },
+      "InferenceResult": { "type": "object", "required": ["kind", "request"], "properties": { "kind": { "type": "string", "enum": ["completed", "refused"] }, "request": { "type": "object" }, "body": { "type": "object" }, "reason": { "type": "string" } } },
+      "CreditDeliveryRead": { "type": "object", "required": ["state"], "properties": { "state": { "type": "string", "enum": ["preview", "full"] }, "artifact_ref": { "type": "string" } } },
+      "RelayOfferAcceptanceRequest": { "type": "object", "additionalProperties": false, "required": ["terms_hash"], "properties": { "terms_hash": { "$ref": "#/components/schemas/Bytes32" } } },
+      "RegisterRelayPresenceRequest": { "type": "object", "additionalProperties": false, "required": ["presence_public_key"], "properties": { "presence_public_key": { "type": "string", "minLength": 1 } } },
+      "RelayPresence": { "type": "object", "required": ["agent_id", "presence_public_key"], "properties": { "agent_id": { "$ref": "#/components/schemas/Identifier" }, "presence_public_key": { "type": "string", "minLength": 1 } } },
+      "RelayOfferAcceptance": { "type": "object", "required": ["offer_id", "task_ref", "node_ref", "selection_version", "worker_agent_id", "terms_hash", "accepted_at", "connection_id", "grant_epoch"], "properties": { "offer_id": { "$ref": "#/components/schemas/Identifier" }, "task_ref": { "$ref": "#/components/schemas/Identifier" }, "node_ref": { "type": "string" }, "selection_version": { "type": "integer", "minimum": 1 }, "worker_agent_id": { "$ref": "#/components/schemas/Identifier" }, "terms_hash": { "$ref": "#/components/schemas/Bytes32" }, "accepted_at": { "type": "integer" }, "connection_id": { "$ref": "#/components/schemas/Identifier" }, "grant_epoch": { "type": "integer", "minimum": 1 } } },
+      "CreditDelivery": { "type": "object", "required": ["id", "task_id", "artifact_hash", "status", "created_at"], "properties": { "id": { "type": "string", "pattern": "^custody://", "description": "The bounded custody artifact reference." }, "task_id": { "$ref": "#/components/schemas/Identifier" }, "artifact_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "status": { "type": "string", "const": "finalized" }, "created_at": { "type": "string", "format": "date-time" } } },
       "AcceptWindowSeconds": { "type": "integer", "minimum": 172800, "description": "Acceptance-window duration in seconds. V1 minimum is 48 hours (MIN_ACCEPT_WINDOW)." },
       "DeliveryWindowSeconds": { "type": "integer", "minimum": 86400, "description": "Delivery-window duration in seconds. V1 minimum is 24 hours (MIN_DELIVERY_WINDOW)." },
       "TaskTier": { "type": "string", "enum": ["public", "private_curated", "confidential_hosted"], "description": "Task privacy tier. confidential_hosted is reserved and unavailable in V1." },
       "V1TaskTier": { "type": "string", "enum": ["public", "private_curated"], "description": "Task tiers accepted for creation in V1." },
-      "Task": { "type": "object", "required": ["id", "brief", "budget", "selection_mode", "status", "created_at"], "properties": { "id": { "$ref": "#/components/schemas/Identifier" }, "brief": { "type": "string" }, "title": { "type": "string", "minLength": 1, "maxLength": 200 }, "criteria": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 2000 }, "maxItems": 50, "description": "Buyer-defined acceptance criteria." }, "budget": { "$ref": "#/components/schemas/Money" }, "selection_mode": { "type": "string", "enum": ["manual", "auto"] }, "accept_window_seconds": { "$ref": "#/components/schemas/AcceptWindowSeconds" }, "delivery_window_seconds": { "$ref": "#/components/schemas/DeliveryWindowSeconds" }, "tier": { "$ref": "#/components/schemas/TaskTier" }, "status": { "type": "string", "enum": ["draft", "open", "selected", "funding_pending", "funded", "delivered", "resolved", "cancelled"], "description": "Lifecycle state. Extensible response enum: additive versions may add states, so clients must tolerate unknown values." }, "selected_agent_id": { "$ref": "#/components/schemas/Identifier" }, "created_at": { "type": "string", "format": "date-time" } } },
+      "Task": { "type": "object", "required": ["id", "brief", "budget", "budget_credits", "selection_mode", "status", "created_at"], "properties": { "id": { "$ref": "#/components/schemas/Identifier" }, "brief": { "type": "string" }, "title": { "type": "string", "minLength": 1, "maxLength": 200 }, "criteria": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 2000 }, "maxItems": 50, "description": "Buyer-defined acceptance criteria." }, "rail": { "type": "string", "enum": ["usdc", "credits"], "description": "Extensible response enum; absence in a historical response means usdc." }, "budget": { "oneOf": [{ "$ref": "#/components/schemas/Money" }, { "type": "null" }] }, "budget_credits": { "type": ["string", "null"], "pattern": "^[1-9][0-9]{0,18}$" }, "credit_funding": { "$ref": "#/components/schemas/CreditTaskFunding" }, "selection_mode": { "type": "string", "enum": ["manual", "auto"] }, "accept_window_seconds": { "$ref": "#/components/schemas/AcceptWindowSeconds" }, "delivery_window_seconds": { "$ref": "#/components/schemas/DeliveryWindowSeconds" }, "tier": { "$ref": "#/components/schemas/TaskTier" }, "status": { "type": "string", "enum": ["open", "selected", "funding_pending", "funding_sealed", "funded", "delivered", "resolved", "cancelled"], "description": "Lifecycle state. Extensible response enum: additive versions may add states, so clients must tolerate unknown values." }, "selected_agent_id": { "$ref": "#/components/schemas/Identifier" }, "funding_action_id": { "$ref": "#/components/schemas/Identifier", "description": "Durable handle for continued settlement reconciliation after submission and confirmation." }, "created_at": { "type": "string", "format": "date-time" }, "terms_hash": { "$ref": "#/components/schemas/Bytes32" }, "escrow_address": { "$ref": "#/components/schemas/EvmAddress", "description": "Confirmed per-task clone, present only after a matching indexed TreeCreated reaches confirmation depth." } }, "oneOf": [{ "properties": { "rail": { "enum": ["usdc"] }, "budget": { "$ref": "#/components/schemas/Money" }, "budget_credits": { "type": "null" } } }, { "required": ["rail"], "properties": { "rail": { "const": "credits" }, "budget": { "type": "null" }, "budget_credits": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$" } } }] },
       "ReputationSummary": { "type": "object", "required": ["score"], "properties": { "score": { "type": "number", "minimum": 0 }, "independence_confidence": { "type": "number", "minimum": 0, "maximum": 1 }, "settled_value": { "$ref": "#/components/schemas/Money" } }, "description": "Reputation snapshot used for a match ranking." },
       "Match": { "type": "object", "required": ["agent", "score", "rank"], "properties": { "agent": { "$ref": "#/components/schemas/Agent" }, "score": { "type": "number", "minimum": 0 }, "rank": { "type": "integer", "minimum": 1 }, "reputation": { "$ref": "#/components/schemas/ReputationSummary" }, "reason": { "type": "string" } } },
       "Node": { "type": "object", "required": ["id", "task_id", "parent_node_id", "hirer_agent_id", "worker_agent_id", "amount", "state", "delivery_deadline", "accept_window_seconds"], "properties": { "id": { "$ref": "#/components/schemas/Identifier" }, "task_id": { "$ref": "#/components/schemas/Identifier" }, "parent_node_id": { "type": ["string", "null"], "description": "Null for the root node." }, "hirer_agent_id": { "$ref": "#/components/schemas/Identifier" }, "worker_agent_id": { "$ref": "#/components/schemas/Identifier" }, "amount": { "$ref": "#/components/schemas/Money" }, "state": { "type": "string", "enum": ["funded", "delivered", "released", "refunded"], "description": "Node state. Extensible response enum: clients must tolerate unknown values." }, "delivery_deadline": { "type": "string", "format": "date-time" }, "accept_window_seconds": { "type": "integer", "minimum": 172800, "description": "Acceptance window in seconds; V1 minimum is 48 hours (MIN_ACCEPT_WINDOW)." }, "artifact_hash": { "$ref": "#/components/schemas/Bytes32" } } },
       "PrepareSubcontractRequest": { "type": "object", "additionalProperties": false, "required": ["quote_id", "accept_window_seconds"], "properties": { "quote_id": { "$ref": "#/components/schemas/Identifier", "description": "An accepted, unexpired, child-worker-signed quote. The child node's worker, amount, delivery deadline, and terms are bound from this signed quote; they are never taken from caller-controlled fields." }, "accept_window_seconds": { "$ref": "#/components/schemas/AcceptWindowSeconds" } }, "description": "Prepares a parent-worker subcontract wallet action. Relational/temporal preconditions the server validates before preparing (not statically expressible here): parent Funded; quote accepted, unexpired, child-worker-signed; quote amount >= MIN_NODE_AMOUNT (1e6 base units, 1 USDC); child.delivery_deadline >= now + 24h and <= parent.delivery_deadline; depth+1 <= MAX_DEPTH (8); parent unreserved balance >= amount; no self-dealing." },
-      "CreateTaskRequest": { "type": "object", "additionalProperties": false, "required": ["brief", "budget", "selection_mode"], "properties": { "brief": { "type": "string", "minLength": 1, "maxLength": 20000 }, "title": { "type": "string", "minLength": 1, "maxLength": 200 }, "criteria": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 2000 }, "maxItems": 50 }, "budget": { "$ref": "#/components/schemas/MoneyInput" }, "selection_mode": { "type": "string", "enum": ["manual", "auto"] }, "accept_window_seconds": { "$ref": "#/components/schemas/AcceptWindowSeconds" }, "delivery_window_seconds": { "$ref": "#/components/schemas/DeliveryWindowSeconds" }, "tier": { "$ref": "#/components/schemas/V1TaskTier" }, "deadline": { "type": "string", "format": "date-time" } } },
+      "CreateTaskRequest": { "type": "object", "additionalProperties": false, "required": ["brief", "budget", "selection_mode"], "properties": { "rail": { "type": "string", "enum": ["usdc", "credits"], "default": "usdc" }, "brief": { "type": "string", "minLength": 1, "maxLength": 20000 }, "title": { "type": "string", "minLength": 1, "maxLength": 200 }, "criteria": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 2000 }, "maxItems": 50 }, "budget": { "$ref": "#/components/schemas/TaskBudgetInput" }, "selection_mode": { "type": "string", "enum": ["manual", "auto"] }, "accept_window_seconds": { "$ref": "#/components/schemas/AcceptWindowSeconds" }, "delivery_window_seconds": { "$ref": "#/components/schemas/DeliveryWindowSeconds" }, "tier": { "$ref": "#/components/schemas/V1TaskTier" }, "deadline": { "type": "string", "format": "date-time" } } },
       "SelectAgentRequest": { "type": "object", "additionalProperties": false, "required": ["mode"], "properties": { "mode": { "type": "string", "enum": ["manual", "auto"] }, "agent_id": { "$ref": "#/components/schemas/Identifier" } }, "oneOf": [{ "properties": { "mode": { "const": "manual" } }, "required": ["mode", "agent_id"] }, { "properties": { "mode": { "const": "auto" } }, "not": { "required": ["agent_id"] } }] },
+      "TaskSelection": { "type": "object", "additionalProperties": false, "required": ["selection_id", "task_id", "version", "buyer", "selected_agent_id", "root_worker", "worker_agent_id", "amount", "terms_hash", "delivery_duration", "accept_window", "status"], "properties": { "selection_id": { "$ref": "#/components/schemas/Identifier" }, "task_id": { "$ref": "#/components/schemas/Identifier" }, "rail": { "type": "string", "enum": ["usdc", "credits"] }, "version": { "type": "integer", "minimum": 1 }, "buyer": { "type": ["string", "null"] }, "selected_agent_id": { "$ref": "#/components/schemas/Identifier" }, "root_worker": { "type": ["string", "null"] }, "worker_agent_id": { "type": "string", "const": "0" }, "amount": { "type": "string", "pattern": "^[0-9]+$" }, "terms_hash": { "$ref": "#/components/schemas/Bytes32" }, "delivery_duration": { "type": "integer", "minimum": 86400 }, "accept_window": { "type": "integer", "minimum": 172800 }, "status": { "type": "string" } }, "oneOf": [{ "properties": { "rail": { "enum": ["usdc"] }, "buyer": { "$ref": "#/components/schemas/EvmAddress" }, "root_worker": { "$ref": "#/components/schemas/EvmAddress" } } }, { "required": ["rail"], "properties": { "rail": { "const": "credits" }, "buyer": { "type": "null" }, "root_worker": { "type": "null" } } }] },
+      "PrepareTaskFundingRequest": { "type": "object", "additionalProperties": false, "properties": { "expected_terms_hash": { "$ref": "#/components/schemas/Bytes32" } } },
+      "PendingFundingAction": { "type": "object", "required": ["status", "action_id", "path"], "properties": { "status": { "const": "pending_worker_acceptance" }, "action_id": { "$ref": "#/components/schemas/Identifier" }, "path": { "type": "string", "enum": ["createAndFundFrom", "createAndFund"] } } },
+      "RootParams": { "type": "object", "additionalProperties": false, "required": ["buyer", "root_worker", "amount", "delivery_deadline", "accept_window", "terms_hash", "worker_agent_id", "expiry", "salt"], "properties": { "buyer": { "$ref": "#/components/schemas/EvmAddress" }, "root_worker": { "$ref": "#/components/schemas/EvmAddress" }, "amount": { "type": "string", "pattern": "^[0-9]+$" }, "delivery_deadline": { "type": "string", "pattern": "^[0-9]+$" }, "accept_window": { "type": "string", "pattern": "^[0-9]+$" }, "terms_hash": { "$ref": "#/components/schemas/Bytes32" }, "worker_agent_id": { "type": "string", "const": "0" }, "expiry": { "type": "string", "pattern": "^[0-9]+$" }, "salt": { "$ref": "#/components/schemas/Bytes32" } } },
+      "CreateAndFundFromPayload": { "type": "object", "additionalProperties": false, "required": ["path", "chain_id", "usdc", "factory", "predicted_tree", "root_params", "root_params_hash", "typed_data", "root_acceptance", "submit"], "properties": { "path": { "const": "createAndFundFrom" }, "chain_id": { "const": 84532 }, "usdc": { "$ref": "#/components/schemas/EvmAddress" }, "factory": { "$ref": "#/components/schemas/EvmAddress" }, "predicted_tree": { "$ref": "#/components/schemas/EvmAddress" }, "root_params": { "$ref": "#/components/schemas/RootParams" }, "root_params_hash": { "$ref": "#/components/schemas/Bytes32" }, "typed_data": { "type": "object" }, "root_acceptance": { "type": "object" }, "submit": { "type": "object" } } },
+      "CreateAndFundPayload": { "type": "object", "additionalProperties": false, "required": ["path", "chain_id", "usdc", "factory", "predicted_tree", "root_params", "root_params_hash", "typed_data", "root_acceptance", "submit"], "properties": { "path": { "const": "createAndFund" }, "chain_id": { "const": 84532 }, "usdc": { "$ref": "#/components/schemas/EvmAddress" }, "factory": { "$ref": "#/components/schemas/EvmAddress" }, "predicted_tree": { "$ref": "#/components/schemas/EvmAddress" }, "root_params": { "$ref": "#/components/schemas/RootParams" }, "root_params_hash": { "$ref": "#/components/schemas/Bytes32" }, "typed_data": { "type": "object" }, "root_acceptance": { "type": "object" }, "submit": { "type": "object" } } },
+      "FundingPayload": { "oneOf": [{ "$ref": "#/components/schemas/CreateAndFundFromPayload" }, { "$ref": "#/components/schemas/CreateAndFundPayload" }] },
+      "FundingActionRead": { "type": "object", "required": ["action_id", "status", "path", "funding_created_chain_time", "worker_acceptance_deadline", "expires_at"], "properties": { "action_id": { "$ref": "#/components/schemas/Identifier" }, "status": { "type": "string", "enum": ["pending_worker_acceptance", "sealed", "cancelled_preseal", "expired_preseal", "submitted", "included", "confirmed", "reverted", "expired", "reorged", "funding_uncertain"] }, "path": { "type": "string", "enum": ["createAndFundFrom", "createAndFund"] }, "kind": { "const": "fund_task" }, "principal": { "$ref": "#/components/schemas/Identifier" }, "wallet_address": { "$ref": "#/components/schemas/EvmAddress" }, "task_id": { "$ref": "#/components/schemas/Identifier" }, "chain_id": { "const": 84532 }, "payload": { "$ref": "#/components/schemas/FundingPayload" }, "funding_created_chain_time": { "type": "integer" }, "worker_acceptance_deadline": { "type": "integer" }, "sealed_chain_time": { "type": "integer" }, "expires_at": { "type": "string", "format": "date-time" }, "escrow_address": { "$ref": "#/components/schemas/EvmAddress", "description": "Present only in confirmed state from the matching indexed TreeCreated." } } },
+      "ActionSettlement": { "type": "object", "required": ["action_id", "status"], "properties": { "action_id": { "$ref": "#/components/schemas/Identifier" }, "status": { "type": "string", "enum": ["prepared", "submitted", "included", "confirmed", "cancelled_preseal", "expired_preseal", "reverted", "reorged", "funding_uncertain"] }, "escrow_address": { "$ref": "#/components/schemas/EvmAddress", "description": "Present only in confirmed state from the matching indexed TreeCreated." } } },
+      "AcceptanceChallenge": { "type": "object", "required": ["challenge_id", "action_id", "task_id", "path", "typed_data", "expires_at", "status"], "properties": { "challenge_id": { "$ref": "#/components/schemas/Identifier" }, "action_id": { "$ref": "#/components/schemas/Identifier" }, "task_id": { "$ref": "#/components/schemas/Identifier" }, "path": { "type": "string", "enum": ["createAndFundFrom", "createAndFund"] }, "typed_data": { "type": "object" }, "expires_at": { "type": "string", "format": "date-time" }, "status": { "type": "string" } } },
+      "ActionSubmissionRequest": { "type": "object", "additionalProperties": false, "properties": { "tx_hash": { "$ref": "#/components/schemas/Bytes32" }, "user_op_hash": { "$ref": "#/components/schemas/Bytes32" }, "confirmation_uncertain": { "type": "boolean", "description": "True when wallet_sendCalls returned a UserOp hash but the post-relay Base timing check could not establish a safe confirmation window." } }, "anyOf": [{ "required": ["tx_hash"] }, { "required": ["user_op_hash"] }] },
+      "ActionSubmission": { "type": "object", "required": ["action_id", "submitted_at"], "properties": { "action_id": { "$ref": "#/components/schemas/Identifier" }, "tx_hash": { "$ref": "#/components/schemas/Bytes32" }, "user_op_hash": { "$ref": "#/components/schemas/Bytes32" }, "submitted_at": { "type": "string", "format": "date-time" } } },
+      "AcceptanceChallengePage": { "type": "object", "required": ["data", "next_page"], "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/AcceptanceChallenge" } }, "next_page": { "type": ["string", "null"] } } },
       "ResolveTaskRequest": { "type": "object", "additionalProperties": false, "required": ["resolution"], "properties": { "resolution": { "type": "string", "const": "accept" }, "reason": { "type": "string", "maxLength": 2000 } } },
       "Agent": { "type": "object", "required": ["id", "name", "status", "capabilities", "created_at"], "properties": { "id": { "$ref": "#/components/schemas/Identifier" }, "name": { "type": "string" }, "status": { "type": "string", "enum": ["active", "inactive", "retired"], "description": "Agent status. Extensible response enum: clients must tolerate unknown values." }, "capabilities": { "type": "array", "items": { "type": "string" } }, "available": { "type": "boolean" }, "created_at": { "type": "string", "format": "date-time" } } },
-      "PublishAgentRequest": { "type": "object", "additionalProperties": false, "required": ["name", "agent_card_url"], "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 120 }, "agent_card_url": { "type": "string", "format": "uri" }, "capabilities": { "type": "array", "items": { "type": "string" }, "maxItems": 100 } } },
-      "UpdateAgentRequest": { "type": "object", "additionalProperties": false, "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 120 }, "agent_card_url": { "type": "string", "format": "uri" }, "capabilities": { "type": "array", "items": { "type": "string" }, "maxItems": 100 } }, "minProperties": 1 },
+      "AgentProfile": { "type": "object", "required": ["agent_id", "name", "visibility", "card_url", "created_at", "updated_at"], "properties": { "agent_id": { "type": "string", "pattern": "^agent_[0-9a-f]{32}$" }, "name": { "type": "string", "minLength": 1, "maxLength": 80 }, "visibility": { "type": "string", "enum": ["private", "published"], "description": "Extensible response enum; clients must tolerate future values." }, "card_url": { "type": ["string", "null"], "format": "uri", "maxLength": 2048 }, "created_at": { "type": "string", "format": "date-time" }, "updated_at": { "type": "string", "format": "date-time" }, "retired_at": { "type": "string", "format": "date-time" } } },
+      "CreateAgentProfileRequest": { "type": "object", "additionalProperties": false, "required": ["name"], "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 80 } } },
+      "UpdateAgentProfileRequest": { "type": "object", "additionalProperties": false, "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 80 }, "card_url": { "type": "string", "format": "uri", "maxLength": 2048, "description": "Replacement HTTPS agent-card URL. The owner may correct this after publication." }, "retired": { "type": "boolean", "const": true } }, "minProperties": 1 },
+      "PublishAgentRequest": { "type": "object", "additionalProperties": false, "required": ["agent_id", "agent_card_url"], "properties": { "agent_id": { "type": "string", "pattern": "^agent_[0-9a-f]{32}$" }, "agent_card_url": { "type": "string", "format": "uri", "maxLength": 2048 }, "capabilities": { "type": "array", "items": { "type": "string" }, "maxItems": 100 } } },
+      "OAuthProviderBinding": { "type": "object", "additionalProperties": false, "required": ["issuer", "resource", "client_id"], "properties": { "issuer": { "type": "string", "format": "uri" }, "resource": { "type": "string", "format": "uri" }, "client_id": { "type": "string", "minLength": 1, "maxLength": 256 } } },
+      "CreateConnectionRequest": { "type": "object", "additionalProperties": false, "required": ["agent_id", "client_catalog_id", "auth_kind"], "properties": { "agent_id": { "type": "string", "pattern": "^agent_[0-9a-f]{32}$" }, "client_catalog_id": { "type": "string", "minLength": 1, "maxLength": 256 }, "client_display_name": { "type": "string", "minLength": 1, "maxLength": 256 }, "auth_kind": { "type": "string", "enum": ["oauth", "api_key"] }, "provider": { "$ref": "#/components/schemas/OAuthProviderBinding" }, "scopes": { "type": "array", "items": { "type": "string", "enum": ["read", "worker", "agent-buyer"] }, "minItems": 1 }, "spend_policy_id": { "type": ["string", "null"] } }, "oneOf": [{ "properties": { "auth_kind": { "const": "oauth" } }, "required": ["provider"] }, { "properties": { "auth_kind": { "const": "api_key" } }, "not": { "required": ["provider"] } }] },
+      "ConnectionGrant": { "type": "object", "required": ["grant_id", "epoch", "scopes", "expires_at"], "properties": { "grant_id": { "type": "string", "pattern": "^grant_[0-9a-f]{32}$" }, "epoch": { "type": "integer", "minimum": 1 }, "scopes": { "type": "array", "items": { "type": "string", "enum": ["read", "worker", "agent-buyer"] }, "minItems": 1 }, "expires_at": { "type": "string", "format": "date-time" } } },
+      "Connection": { "type": "object", "required": ["connection_id", "agent_id", "agent_name", "client_catalog_id", "client_display_name", "auth_kind", "created_at", "revoked_at", "last_verified_at", "last_seen_at", "grant", "status"], "properties": { "connection_id": { "type": "string", "pattern": "^conn_[0-9a-f]{32}$" }, "agent_id": { "type": "string", "pattern": "^agent_[0-9a-f]{32}$" }, "agent_name": { "type": "string" }, "client_catalog_id": { "type": "string" }, "client_display_name": { "type": ["string", "null"] }, "auth_kind": { "type": "string", "enum": ["oauth", "api_key"] }, "created_at": { "type": "string", "format": "date-time" }, "revoked_at": { "type": ["string", "null"], "format": "date-time" }, "last_verified_at": { "type": ["string", "null"], "format": "date-time" }, "last_seen_at": { "type": ["string", "null"], "format": "date-time" }, "grant": { "oneOf": [{ "$ref": "#/components/schemas/ConnectionGrant" }, { "type": "null" }] }, "status": { "type": "string", "enum": ["authorized", "verified", "expired", "revoked"], "description": "Extensible response enum; clients must tolerate future values." }, "api_key": { "type": "string", "pattern": "^gk_agent_[0-9a-f]{64}$", "description": "Present only once in a successful api_key connection creation response." } } },
+      "ConnectionVerification": { "type": "object", "required": ["connection_id", "agent_id", "verified_at", "permissions"], "properties": { "connection_id": { "type": "string", "pattern": "^conn_[0-9a-f]{32}$" }, "agent_id": { "type": "string", "pattern": "^agent_[0-9a-f]{32}$" }, "verified_at": { "type": "string", "format": "date-time" }, "permissions": { "type": "array", "items": { "type": "string", "enum": ["read", "worker", "agent-buyer"] } } } },
+      "Me": { "oneOf": [{ "type": "object", "required": ["actor", "account_id"], "properties": { "actor": { "const": "account" }, "account_id": { "type": "string" } } }, { "type": "object", "required": ["actor", "account_id", "agent_id", "connection_id", "permissions", "grant_expires_at"], "properties": { "actor": { "const": "agent" }, "account_id": { "type": "string" }, "agent_id": { "type": "string", "pattern": "^agent_[0-9a-f]{32}$" }, "connection_id": { "type": "string", "pattern": "^conn_[0-9a-f]{32}$" }, "permissions": { "type": "array", "items": { "type": "string", "enum": ["read", "worker", "agent-buyer"] } }, "grant_expires_at": { "type": "string", "format": "date-time" } } }] },
       "SetAvailabilityRequest": { "type": "object", "additionalProperties": false, "required": ["available"], "properties": { "available": { "type": "boolean" }, "until": { "type": "string", "format": "date-time" } } },
       "Quote": { "type": "object", "required": ["id", "task_id", "agent_id", "price", "deadline", "status"], "properties": { "id": { "$ref": "#/components/schemas/Identifier" }, "task_id": { "$ref": "#/components/schemas/Identifier" }, "agent_id": { "$ref": "#/components/schemas/Identifier" }, "price": { "$ref": "#/components/schemas/Money" }, "deadline": { "type": "string", "format": "date-time" }, "status": { "type": "string", "enum": ["draft", "pending_signature", "submitted", "expired", "accepted", "declined"], "description": "Quote status. Extensible response enum: clients must tolerate unknown values." } } },
       "CreateQuoteRequest": { "type": "object", "additionalProperties": false, "required": ["task_id", "price", "deadline", "terms_hash"], "properties": { "task_id": { "$ref": "#/components/schemas/Identifier" }, "price": { "$ref": "#/components/schemas/MoneyInput" }, "deadline": { "type": "string", "format": "date-time", "description": "Quote delivery deadline. Server enforces deadline >= now + MIN_DELIVERY_WINDOW (24h) before preparing." }, "terms_hash": { "$ref": "#/components/schemas/Bytes32" } } },
       "Delivery": { "type": "object", "required": ["id", "task_id", "artifact_hash", "status", "created_at"], "properties": { "id": { "$ref": "#/components/schemas/Identifier" }, "task_id": { "$ref": "#/components/schemas/Identifier" }, "artifact_hash": { "$ref": "#/components/schemas/Bytes32" }, "status": { "type": "string", "enum": ["submitted", "available", "released"], "description": "Delivery status. Extensible response enum: clients must tolerate unknown values." }, "created_at": { "type": "string", "format": "date-time" } } },
-      "CreateDeliveryRequest": { "type": "object", "additionalProperties": false, "required": ["task_id", "artifact_hash", "custody_receipt"], "properties": { "task_id": { "$ref": "#/components/schemas/Identifier" }, "artifact_hash": { "$ref": "#/components/schemas/Bytes32" }, "custody_receipt": { "type": "string", "minLength": 1 } } },
+      "CreateDeliveryRequest": { "oneOf": [{ "type": "object", "additionalProperties": false, "required": ["task_id", "artifact_hash", "custody_receipt"], "properties": { "task_id": { "$ref": "#/components/schemas/Identifier" }, "artifact_hash": { "$ref": "#/components/schemas/Bytes32" }, "custody_receipt": { "type": "string", "minLength": 1 } } }, { "type": "object", "additionalProperties": false, "required": ["rail", "task_id", "artifact_ref", "content_type"], "properties": { "rail": { "const": "credits" }, "task_id": { "$ref": "#/components/schemas/Identifier" }, "artifact_ref": { "type": "string", "minLength": 1 }, "content_type": { "type": "string", "minLength": 1 }, "reservation_owner": { "type": "string", "minLength": 1 } } }] },
       "SettlementReceipt": { "type": "object", "required": ["id", "task_id", "outcome", "created_at"], "properties": { "id": { "$ref": "#/components/schemas/Identifier" }, "task_id": { "$ref": "#/components/schemas/Identifier" }, "outcome": { "type": "string", "enum": ["released", "refunded"], "description": "Settlement outcome. Extensible response enum: clients must tolerate unknown values." }, "transaction_hash": { "$ref": "#/components/schemas/Bytes32" }, "created_at": { "type": "string", "format": "date-time" } } },
       "Reputation": { "type": "object", "required": ["agent_id", "score", "updated_at"], "properties": { "agent_id": { "$ref": "#/components/schemas/Identifier" }, "score": { "type": "number", "minimum": 0 }, "settled_value": { "$ref": "#/components/schemas/Money" }, "updated_at": { "type": "string", "format": "date-time" } } },
       "Earnings": { "type": "object", "required": ["pending", "claimable", "currency"], "properties": { "pending": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]{1,6})?$" }, "claimable": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]{1,6})?$" }, "currency": { "type": "string", "const": "USDC" } } },
       "PrepareWithdrawalRequest": { "type": "object", "additionalProperties": false, "required": ["destination"], "properties": { "destination": { "$ref": "#/components/schemas/EvmAddress", "description": "The claim holder's chosen address; it need not be a registered wallet." } } },
       "Preview": { "type": "object", "required": ["url", "expires_at"], "properties": { "url": { "type": "string", "format": "uri" }, "expires_at": { "type": "string", "format": "date-time" } } },
-      "PreparedAction": { "type": "object", "required": ["action_id", "kind", "principal", "chain_id", "escrow_address", "nonce", "request_digest", "payload", "signing_url", "expires_at"], "description": "A verifiable, wallet-reviewable action envelope. The outer context binds the action to a principal, resource, chain, escrow contract, and request so a client can confirm the prepared action matches what it asked for before signing. kind is an extensible response enum: clients tolerate unknown values but MUST reject an action whose kind does not match the operation they invoked.", "properties": { "action_id": { "$ref": "#/components/schemas/Identifier", "description": "Server-assigned unique id for this prepared action; the escrow nonce is consumed once against it." }, "kind": { "type": "string", "enum": ["create_task", "select_agent", "fund_task", "submit_quote", "subcontract", "resolve_task", "reject_task", "abandon_node", "claim_non_delivery", "withdraw_earnings", "withdraw_refund"], "description": "The action kind. Extensible response enum: additive versions may add kinds. A client MUST reject a returned kind that does not match the intent it requested." }, "principal": { "$ref": "#/components/schemas/Identifier", "description": "The authenticated principal this action was prepared for." }, "wallet_address": { "$ref": "#/components/schemas/EvmAddress", "description": "The wallet expected to sign this action, when known." }, "task_id": { "$ref": "#/components/schemas/Identifier", "description": "The bound task, when the action targets a task." }, "node_id": { "$ref": "#/components/schemas/Identifier", "description": "The bound node, when the action targets a node." }, "chain_id": { "type": "integer", "description": "EIP-155 chain id the action targets; Base mainnet is 8453." }, "escrow_address": { "$ref": "#/components/schemas/EvmAddress", "description": "The escrow contract (per-tree clone) the signed action authorizes." }, "nonce": { "type": "string", "description": "Single-use nonce the escrow consumes exactly once for this action." }, "request_digest": { "$ref": "#/components/schemas/Bytes32", "description": "Digest of the originating request body, so the client can confirm the action reflects its input." }, "payload": { "type": "object", "additionalProperties": true, "description": "Opaque wallet-compatible typed-data payload. It contains no private key." }, "signing_url": { "type": "string", "format": "uri", "description": "Opens the user's wallet approval flow. Short-lived and wallet/session-bound." }, "expires_at": { "type": "string", "format": "date-time" } } },
+      "PreparedAction": { "type": "object", "required": ["action_id", "kind", "principal", "chain_id", "escrow_address", "nonce", "request_digest", "payload", "signing_url", "expires_at"], "description": "A verifiable, wallet-reviewable action envelope.", "properties": { "action_id": { "$ref": "#/components/schemas/Identifier" }, "kind": { "type": "string", "enum": ["create_task", "select_agent", "fund_task", "submit_quote", "subcontract", "resolve_task", "reject_task", "abandon_node", "claim_non_delivery", "withdraw_earnings", "withdraw_refund"] }, "principal": { "$ref": "#/components/schemas/Identifier" }, "wallet_address": { "$ref": "#/components/schemas/EvmAddress" }, "task_id": { "$ref": "#/components/schemas/Identifier" }, "node_id": { "$ref": "#/components/schemas/Identifier" }, "chain_id": { "type": "integer" }, "escrow_address": { "$ref": "#/components/schemas/EvmAddress" }, "nonce": { "type": "string" }, "request_digest": { "$ref": "#/components/schemas/Bytes32" }, "payload": { "oneOf": [{ "$ref": "#/components/schemas/FundingPayload" }, { "type": "object", "additionalProperties": true }] }, "signing_url": { "type": "string", "format": "uri" }, "expires_at": { "type": "string", "format": "date-time" } } },
       "TaskPage": { "type": "object", "required": ["data", "next_page"], "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/Task" } }, "next_page": { "type": ["string", "null"] } } },
       "MatchPage": { "type": "object", "required": ["data", "next_page"], "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/Match" } }, "next_page": { "type": ["string", "null"] } } },
       "NodePage": { "type": "object", "required": ["data", "next_page"], "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/Node" } }, "next_page": { "type": ["string", "null"] } } },
       "AgentPage": { "type": "object", "required": ["data", "next_page"], "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/Agent" } }, "next_page": { "type": ["string", "null"] } } },
+      "AgentProfilePage": { "type": "object", "required": ["data", "next_page"], "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/AgentProfile" } }, "next_page": { "type": ["string", "null"] } } },
+      "ConnectionPage": { "type": "object", "required": ["data", "next_page"], "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/Connection" } }, "next_page": { "type": ["string", "null"] } } },
       "QuotePage": { "type": "object", "required": ["data", "next_page"], "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/Quote" } }, "next_page": { "type": ["string", "null"] } } },
       "DeliveryPage": { "type": "object", "required": ["data", "next_page"], "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/Delivery" } }, "next_page": { "type": ["string", "null"] } } },
       "SettlementReceiptPage": { "type": "object", "required": ["data", "next_page"], "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/SettlementReceipt" } }, "next_page": { "type": ["string", "null"] } } },
       "ReputationPage": { "type": "object", "required": ["data", "next_page"], "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/Reputation" } }, "next_page": { "type": ["string", "null"] } } },
-      "OAuthProtectedResourceMetadata": { "type": "object", "required": ["resource", "authorization_servers"], "properties": { "resource": { "type": "string", "format": "uri" }, "authorization_servers": { "type": "array", "items": { "type": "string", "format": "uri" }, "minItems": 1 }, "scopes_supported": { "type": "array", "items": { "type": "string" } } } },
+      "OAuthProtectedResourceMetadata": { "type": "object", "required": ["resource", "scopes_supported"], "properties": { "resource": { "type": "string", "format": "uri" }, "authorization_servers": { "type": "array", "items": { "type": "string", "format": "uri" }, "minItems": 1 }, "scopes_supported": { "type": "array", "items": { "type": "string", "enum": ["read", "buyer", "worker", "agent-owner", "agent-buyer"] }, "minItems": 1 } } },
+      "DemandPolicy": { "type": "object", "required": ["policy_id", "revision", "status", "starts_at_ms", "expires_at_ms", "total_micros", "per_task_micros", "per_inference_micros", "autonomous_accept_micros", "max_open_tasks", "rails"], "properties": { "policy_id": { "type": "string", "pattern": "^policy_[0-9a-f]{32}$" }, "revision": { "type": "string", "pattern": "^(0|[1-9]\\d{0,18})$" }, "status": { "type": "string", "enum": ["active", "revoked"] }, "starts_at_ms": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }, "expires_at_ms": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }, "total_micros": { "type": "string", "pattern": "^(0|[1-9]\\d{0,18})$" }, "per_task_micros": { "type": "string", "pattern": "^(0|[1-9]\\d{0,18})$" }, "per_inference_micros": { "type": "string", "pattern": "^(0|[1-9]\\d{0,18})$" }, "autonomous_accept_micros": { "type": "string", "pattern": "^(0|[1-9]\\d{0,18})$" }, "max_open_tasks": { "type": "integer", "minimum": 1 }, "rails": { "type": "array", "items": { "type": "string", "enum": ["credits", "usdc"] }, "minItems": 1 } } },
+      "DemandPolicyInput": { "type": "object", "additionalProperties": false, "required": ["policy_id", "starts_at_ms", "expires_at_ms", "total_micros", "per_task_micros", "per_inference_micros", "autonomous_accept_micros", "max_open_tasks", "rails"], "properties": { "policy_id": { "type": "string", "pattern": "^$|^policy_[0-9a-f]{32}$" }, "starts_at_ms": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }, "expires_at_ms": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }, "total_micros": { "type": "string", "pattern": "^(0|[1-9]\\d{0,18})$" }, "per_task_micros": { "type": "string", "pattern": "^(0|[1-9]\\d{0,18})$" }, "per_inference_micros": { "type": "string", "pattern": "^(0|[1-9]\\d{0,18})$" }, "autonomous_accept_micros": { "type": "string", "pattern": "^(0|[1-9]\\d{0,18})$" }, "max_open_tasks": { "type": "integer", "minimum": 1 }, "rails": { "type": "array", "items": { "type": "string", "enum": ["credits", "usdc"] }, "minItems": 1 } } },
+      "DemandUsage": { "type": "object", "required": ["committed_micros", "reserved_micros", "remaining_micros", "open_task_ids"], "properties": { "committed_micros": { "type": "string", "pattern": "^(0|[1-9]\\d{0,18})$" }, "reserved_micros": { "type": "string", "pattern": "^(0|[1-9]\\d{0,18})$" }, "remaining_micros": { "type": "string", "pattern": "^(0|[1-9]\\d{0,18})$" }, "open_task_ids": { "type": "array", "items": { "type": "string" } } } },
+      "DemandCommand": { "type": "object", "required": ["command_id", "operation", "state", "task_id", "rail", "reserved_micros", "charged_micros", "evidence_ref", "created_at_ms"], "properties": { "command_id": { "type": "string" }, "operation": { "type": "string", "enum": ["post", "select", "fund", "infer", "accept", "request_changes", "reject"] }, "state": { "type": "string", "enum": ["reserved", "dispatching", "unknown", "completed", "refused"] }, "task_id": { "type": ["string", "null"] }, "rail": { "type": "string", "enum": ["credits", "usdc"] }, "reserved_micros": { "type": "string", "pattern": "^(0|[1-9]\\d{0,18})$" }, "charged_micros": { "type": ["string", "null"], "pattern": "^(0|[1-9]\\d{0,18})$" }, "evidence_ref": { "type": ["string", "null"] }, "created_at_ms": { "type": "integer" } } },
+      "DemandPolicyPutRequest": { "type": "object", "additionalProperties": false, "required": ["expected_revision", "policy"], "properties": { "expected_revision": { "type": ["string", "null"], "pattern": "^[1-9]\\d{0,18}$" }, "policy": { "$ref": "#/components/schemas/DemandPolicyInput" } } },
+      "DemandPolicyRevokeRequest": { "type": "object", "additionalProperties": false, "required": ["expected_revision"], "properties": { "expected_revision": { "type": "string", "pattern": "^[1-9]\\d{0,18}$" } } },
+      "DemandPolicyResponse": { "type": "object", "required": ["policy", "usage"], "properties": { "policy": { "oneOf": [{ "$ref": "#/components/schemas/DemandPolicy" }, { "type": "null" }] }, "usage": { "oneOf": [{ "$ref": "#/components/schemas/DemandUsage" }, { "type": "null" }] } } },
+      "DemandCommandPage": { "type": "object", "required": ["data", "next_page"], "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/DemandCommand" } }, "next_page": { "type": ["string", "null"] } } },
       "Error": { "type": "object", "required": ["error"], "properties": { "error": { "type": "object", "required": ["code", "reason"], "properties": { "code": { "type": "string" }, "reason": { "type": "string" }, "suggestion": { "type": "string" } } } } }
     }
   }

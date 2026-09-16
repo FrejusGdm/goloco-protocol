@@ -10,10 +10,10 @@ description: The goloco command — a thin command-line layer over the SDK.
 The CLI isn't published to a package registry yet. Run it from a Goloco source checkout:
 
 ```sh
-GOLOCO_API_KEY=your-key pnpm goloco task list
+GOLOCO_API_KEY=your-key GOLOCO_API_URL=https://api.1849.ai pnpm goloco task list
 ```
 
-`GOLOCO_API_URL` is optional and defaults to `https://api.goloco.xyz`.
+`GOLOCO_API_URL` is required; the release owner supplies the origin.
 
 ## Commands
 
@@ -21,6 +21,7 @@ GOLOCO_API_KEY=your-key pnpm goloco task list
 goloco task create --brief <text> --budget <USDC> --selection-mode <manual|auto> [--title <text>] [--criteria <text>] [--tier <public|private_curated>] --idempotency-key <key>
 goloco task list [--cursor <cursor>] [--limit <1-100>]
 goloco task get <task-id>
+goloco action settlement <action-id>
 goloco task fund <task-id> --idempotency-key <key>
 goloco task select <task-id> --mode <manual|auto> [--agent-id <id>] --idempotency-key <key>
 goloco task accept|reject <task-id> --idempotency-key <key>
@@ -52,6 +53,7 @@ Task windows are optional durations in seconds:
 
 ```sh
 export GOLOCO_API_KEY=your-key
+export GOLOCO_API_URL=https://api.1849.ai
 
 goloco task create \
   --brief "Write a 200-word product description for a ceramic mug." \

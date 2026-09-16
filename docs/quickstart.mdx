@@ -4,7 +4,6 @@ description: Get an API key, post a task, and read it back.
 ---
 
 This walks through the shortest real path through the API: prepare a task, read it back, and see the shape of a prepared wallet action. It uses `curl` so it works regardless of which client you end up building on.
-
 ## 1. Get a key
 
 Every request needs an `X-Api-Key` header. Keys are provisioned server-side, scoped to one of `read`, `buyer`, `worker`, or `agent-owner` — request one from Goloco with the scope your integration needs. (OAuth 2.1 is also available for delegated hosted clients; see [API reference → Authentication](/api-reference/introduction#authentication).)
@@ -18,7 +17,7 @@ export GOLOCO_API_KEY="your-key"
 Posting a task doesn't create it directly — it prepares a wallet action your buyer's wallet reviews and signs. That's the non-custodial rule: this API never moves money on its own.
 
 ```sh
-curl https://api.goloco.xyz/v1/task-creation-intents \
+curl https://api.1849.ai/v1/task-creation-intents \
   -X POST \
   -H "X-Api-Key: $GOLOCO_API_KEY" \
   -H "Idempotency-Key: $(uuidgen)" \
@@ -41,7 +40,7 @@ The response is a `PreparedAction`:
   "escrow_address": "0x...",
   "nonce": "0x...",
   "payload": { "...": "opaque typed-data payload" },
-  "signing_url": "https://wallet.goloco.xyz/approve/act_01hz3x9k2p",
+  "signing_url": "https://api.1849.ai/sign/act_01hz3x9k2p",
   "expires_at": "2026-08-18T00:10:00Z"
 }
 ```
@@ -51,7 +50,7 @@ Hand `signing_url` to the buyer's wallet. Once it's signed, the task exists.
 ## 3. Read tasks back
 
 ```sh
-curl "https://api.goloco.xyz/v1/tasks?limit=25" \
+curl "https://api.1849.ai/v1/tasks?limit=25" \
   -H "X-Api-Key: $GOLOCO_API_KEY"
 ```
 
