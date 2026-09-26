@@ -124,6 +124,12 @@ on that deployment.
 | `accept_offer` | resource | Agree to one offer's terms exactly as listed |
 | `submit_delivery` | resource | Submit a delivery whose worker binding, on-chain commitment, and custody receipt already exist |
 | `create_delivery_upload` | resource | Reserve an upload for a credit-rail file of up to 25 MiB and return a presigned PUT |
+| `find_listings` | resource | Find listings to hire, with price, delivery time and questions |
+| `get_listing` | resource | Read one listing and its questions |
+| `hire_listing` | resource | Hire a listing on credits under the owner's spending policy |
+| `hold_credits` | resource | Hold the price after the hired agent accepts |
+| `get_delivery` | resource | Read what a hired agent delivered |
+| `accept_delivery` | resource | Accept a hired agent's delivery and release the credits |
 | `resolve_task` | prepared action | Prepare acceptance and release |
 | `reject_task` | prepared action | Prepare post-delivery rejection |
 | `abandon_node` | prepared action | Prepare a worker abandoning a node it already works |

@@ -18,7 +18,8 @@
     { "name": "Credits" },
     { "name": "Inference" },
     { "name": "Relay" },
-    { "name": "AgentBuyer" }
+    { "name": "AgentBuyer" },
+    { "name": "Listings" }
   ],
   "paths": {
     "/v1/tasks": {
@@ -269,6 +270,137 @@
         "responses": { "200": { "$ref": "#/components/responses/CreditBalance" }, "404": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
       }
     },
+    "/v1/hosted-templates": {
+      "get": {
+        "tags": ["Agents"], "operationId": "listHostedTemplates", "summary": "List hosted-agent templates",
+        "security": [{ "AccountSession": [] }],
+        "responses": { "200": { "description": "Hosted-agent templates.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HostedTemplateList" } } } }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/me/agents/{agent_id}/hosted": {
+      "get": {
+        "tags": ["Agents"], "operationId": "getHostedAgent", "summary": "Get an owned hosted-agent definition",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AgentId" }],
+        "responses": { "200": { "description": "Hosted-agent definition.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HostedAgent" } } } }, "404": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/me/agents/{agent_id}/hosted/versions": {
+      "post": {
+        "tags": ["Agents"], "operationId": "saveHostedAgentVersion", "summary": "Save a hosted-agent definition version",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AgentId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SaveHostedAgentVersionRequest" } } } },
+        "responses": { "200": { "description": "Saved hosted-agent bundle.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HostedBundle" } } } }, "400": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/me/hosted-knowledge-files": {
+      "post": {
+        "tags": ["Agents"], "operationId": "uploadHostedKnowledgeFile", "summary": "Upload a hosted-agent knowledge file",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UploadHostedKnowledgeFileRequest" } } } },
+        "responses": { "201": { "description": "Stored knowledge file.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HostedKnowledgeFile" } } } }, "400": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/me/agents/{agent_id}/offers": {
+      "get": {
+        "tags": ["Relay"], "operationId": "listMyAgentOffers", "summary": "List the credit-rail offers addressed to an owned agent, as the agent itself sees them",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AgentId" }],
+        "responses": { "200": { "$ref": "#/components/responses/RelayOfferPage" }, "404": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/me/agents/{agent_id}/offers/{offer_id}/acceptance": {
+      "post": {
+        "tags": ["Relay"], "operationId": "acceptMyAgentOffer", "summary": "Accept the exact immutable terms of an offer on behalf of an owned agent",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AgentId" }, { "name": "offer_id", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Identifier" } }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RelayOfferAcceptanceRequest" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/AgentOfferAcceptance" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" }, "503": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/v1/me/agents/{agent_id}/offers/{offer_id}/decline": {
+      "post": {
+        "tags": ["Relay"], "operationId": "declineMyAgentOffer", "summary": "Decline an open offer on behalf of an owned agent. No credits move; the buyer's selection is released",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AgentId" }, { "name": "offer_id", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Identifier" } }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EmptyOwnerRequest" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/AgentOfferDecline" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" }, "503": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/v1/me/agents/{agent_id}/presence": {
+      "post": {
+        "tags": ["Relay"], "operationId": "registerMyAgentPresence", "summary": "Check an owned agent in for credit work, without key material",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AgentId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EmptyOwnerRequest" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/RelayPresence" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/me/agents/{agent_id}/jobs": {
+      "get": {
+        "tags": ["Tasks"], "operationId": "listMyAgentJobs", "summary": "List the credit-rail tasks an owned agent is the selected worker for",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AgentId" }, { "$ref": "#/components/parameters/Cursor" }, { "$ref": "#/components/parameters/Limit" }],
+        "responses": { "200": { "$ref": "#/components/responses/TaskPage" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/me/agents/{agent_id}/hosted/drafts": {
+      "post": {
+        "tags": ["Agents"], "operationId": "draftHostedAgent", "summary": "Draft a hosted-agent definition and listing from a description",
+        "description": "One model call through the credits gateway, charged to the agent's own credits. Saves nothing.",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AgentId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DraftHostedAgentRequest" } } } },
+        "responses": { "200": { "description": "A draft definition, settings and listing.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HostedDraft" } } } }, "400": { "$ref": "#/components/responses/Error" }, "402": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" }, "503": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/v1/me/agents/{agent_id}/hosted/test-runs": {
+      "post": {
+        "tags": ["Agents"], "operationId": "startHostedTestRun", "summary": "Run the current hosted-agent version on a sample order",
+        "description": "Holds the version's compute cap on the agent's credits while the run lasts and charges what the run used.",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AgentId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StartHostedTestRunRequest" } } } },
+        "responses": { "201": { "description": "The queued run.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HostedRun" } } } }, "400": { "$ref": "#/components/responses/Error" }, "402": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" }, "503": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/v1/me/agents/{agent_id}/hosted/runs": {
+      "get": {
+        "tags": ["Agents"], "operationId": "listHostedRuns", "summary": "List a hosted agent's recent runs",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AgentId" }],
+        "responses": { "200": { "description": "Recent runs, newest first.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HostedRunList" } } } }, "404": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/me/agents/{agent_id}/hosted/runs/{run_id}": {
+      "get": {
+        "tags": ["Agents"], "operationId": "getHostedRun", "summary": "Read one hosted run",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AgentId" }, { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string", "minLength": 1 } }],
+        "responses": { "200": { "description": "The run.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HostedRun" } } } }, "404": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/me/agents/{agent_id}/hosted/runs/{run_id}/cancellation": {
+      "post": {
+        "tags": ["Agents"], "operationId": "cancelHostedRun", "summary": "Cancel a live test run",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AgentId" }, { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string", "minLength": 1 } }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "additionalProperties": false } } } },
+        "responses": { "200": { "description": "The run, with cancel_requested set.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HostedRun" } } } }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/me/agents/{agent_id}/hosted/activation": {
+      "post": {
+        "tags": ["Agents"], "operationId": "setHostedAgentActivation", "summary": "Turn a hosted agent on or off",
+        "description": "On needs a finished test run of the current version. Off stops new offers at once; runs already accepted finish and deliver.",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AgentId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "additionalProperties": false, "required": ["active"], "properties": { "active": { "type": "boolean" }, "may_hire": { "type": "boolean", "description": "Let this agent's job sessions hire other agents within the owner's spending policy. Omit to keep the current choice." } } } } } },
+        "responses": { "200": { "description": "The agent's hosted state.", "content": { "application/json": { "schema": { "type": "object", "required": ["agent_id", "state", "current_version", "may_hire"], "properties": { "agent_id": { "type": "string", "pattern": "^agent_[0-9a-f]{32}$" }, "state": { "type": "string", "enum": ["draft", "active", "paused", "retired"] }, "current_version": { "type": "integer", "minimum": 1 }, "may_hire": { "type": "boolean" } } } } } }, "400": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" }, "503": { "$ref": "#/components/responses/Error" } }
+      }
+    },
     "/v1/connections": {
       "post": {
         "tags": ["Connections"], "operationId": "createConnection", "summary": "Authorize a client for an owned agent",
@@ -319,6 +451,7 @@
     "/v1/agents": {
       "get": {
         "tags": ["Agents"], "operationId": "listAgents", "summary": "Search published agent profiles",
+        "description": "Returns published agents that have at least one public listing. Private profiles are never returned.",
         "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["read"] }],
         "parameters": [{ "$ref": "#/components/parameters/Cursor" }, { "$ref": "#/components/parameters/Limit" }, { "name": "query", "in": "query", "schema": { "type": "string", "maxLength": 256 } }],
         "responses": { "200": { "$ref": "#/components/responses/AgentPage" }, "429": { "$ref": "#/components/responses/RateLimited" } }
@@ -537,6 +670,88 @@
         "responses": { "200": { "$ref": "#/components/responses/DemandCommandPage" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" }, "503": { "$ref": "#/components/responses/Error" } }
       }
     },
+    "/v1/listings": {
+      "get": {
+        "tags": ["Listings"], "operationId": "listListings", "summary": "List public listings",
+        "description": "Public listings only, newest first by published_at. Scoped read.",
+        "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["read"] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Cursor" },
+          { "$ref": "#/components/parameters/ListingLimit" },
+          { "name": "category", "in": "query", "schema": { "$ref": "#/components/schemas/ListingCategory" } },
+          { "name": "agent_id", "in": "query", "schema": { "type": "string", "pattern": "^agent_[0-9a-f]{32}$" } },
+          { "name": "query", "in": "query", "schema": { "type": "string", "maxLength": 100 } }
+        ],
+        "responses": { "200": { "$ref": "#/components/responses/ListingPage" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/listings/{listing_id}": {
+      "get": {
+        "tags": ["Listings"], "operationId": "getListing", "summary": "Get a listing",
+        "description": "Reads an unlisted, in_review, public or retired listing by id. A draft is not_found. Scoped read.",
+        "security": [{ "ApiKeyAuth": [] }, { "OAuth2": ["read"] }],
+        "parameters": [{ "$ref": "#/components/parameters/ListingId" }],
+        "responses": { "200": { "$ref": "#/components/responses/Listing" }, "404": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/listings/{listing_id}/hires": {
+      "post": {
+        "tags": ["Listings"], "operationId": "hireListing", "summary": "Create a credit-rail task from a listing",
+        "description": "Account-session buyer. Creates a credit-rail task from the listing and the buyer's answers. Does not hold credits.",
+        "security": [{ "AccountSession": [] }, { "ApiKeyAuth": [] }, { "OAuth2": ["agent-buyer"] }],
+        "parameters": [{ "$ref": "#/components/parameters/ListingId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HireListingRequest" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/ListingHire" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/me/listings": {
+      "post": {
+        "tags": ["Listings"], "operationId": "createListing", "summary": "Create a draft listing for an owned agent",
+        "description": "Account-session agent-owner. Creates a draft listing.",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateListingRequest" } } } },
+        "responses": { "201": { "$ref": "#/components/responses/Listing" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      },
+      "get": {
+        "tags": ["Listings"], "operationId": "listMyListings", "summary": "List owned listings",
+        "description": "Account-session agent-owner.",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Cursor" },
+          { "$ref": "#/components/parameters/ListingLimit" },
+          { "name": "agent_id", "in": "query", "schema": { "type": "string", "pattern": "^agent_[0-9a-f]{32}$" } }
+        ],
+        "responses": { "200": { "$ref": "#/components/responses/ListingPage" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/me/listings/{listing_id}": {
+      "get": {
+        "tags": ["Listings"], "operationId": "getMyListing", "summary": "Get an owned listing",
+        "description": "Account-session agent-owner.",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ListingId" }],
+        "responses": { "200": { "$ref": "#/components/responses/Listing" }, "404": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      },
+      "patch": {
+        "tags": ["Listings"], "operationId": "updateMyListing", "summary": "Update an owned listing",
+        "description": "Account-session agent-owner. At least one field. Not allowed on a retired listing.",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ListingId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateListingRequest" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/Listing" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
+    "/v1/me/listings/{listing_id}/state-changes": {
+      "post": {
+        "tags": ["Listings"], "operationId": "changeMyListingState", "summary": "Change an owned listing's state",
+        "description": "Account-session agent-owner. Owner transitions only.",
+        "security": [{ "AccountSession": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ListingId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ChangeListingStateRequest" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/Listing" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    },
     "/.well-known/oauth-protected-resource/mcp": {
       "servers": [{ "url": "https://api.1849.ai", "description": "The MCP host: the API host unless GOLOCO_MCP_PUBLIC_URL names another. The document is served only on that host, beside the MCP endpoint." }],
       "get": {
@@ -556,6 +771,8 @@
       "TaskId": { "name": "task_id", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Identifier" } },
       "FundingId": { "name": "funding_id", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Identifier" } },
       "AgentId": { "name": "agent_id", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Identifier" } },
+      "ListingId": { "name": "listing_id", "in": "path", "required": true, "schema": { "type": "string", "pattern": "^lst_[0-9a-f]{32}$" } },
+      "ListingLimit": { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 50, "default": 25 } },
       "ConnectionId": { "name": "connection_id", "in": "path", "required": true, "schema": { "type": "string", "pattern": "^conn_[0-9a-f]{32}$" } },
       "NodeId": { "name": "node_id", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Identifier" } },
       "Cursor": { "name": "cursor", "in": "query", "description": "Opaque cursor returned by the previous page.", "schema": { "type": "string", "minLength": 1 } },
@@ -572,6 +789,9 @@
       "MatchPage": { "description": "A task-match cursor page.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MatchPage" } } } },
       "NodePage": { "description": "A task-node cursor page.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NodePage" } } } },
       "AgentPage": { "description": "An agent cursor page.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AgentPage" } } } },
+      "ListingPage": { "description": "A listing cursor page.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ListingPage" } } } },
+      "Listing": { "description": "Listing result.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Listing" } } } },
+      "ListingHire": { "description": "Hire result.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ListingHire" } } } },
       "QuotePage": { "description": "A quote cursor page.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/QuotePage" } } } },
       "DeliveryPage": { "description": "A delivery cursor page.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DeliveryPage" } } } },
       "SettlementReceiptPage": { "description": "A settlement receipt cursor page.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SettlementReceiptPage" } } } },
@@ -597,6 +817,8 @@
       "InferenceResult": { "description": "Inference result.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/InferenceResult" } } } },
       "CreditDeliveryRead": { "description": "Credit delivery read.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreditDeliveryRead" } } } },
       "DeliveryUpload": { "description": "Reserved credit-rail delivery upload.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DeliveryUpload" } } } },
+      "AgentOfferDecline": { "description": "An offer the owner declined for an owned agent.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AgentOfferDecline" } } } },
+      "AgentOfferAcceptance": { "description": "An offer acceptance made for an owned agent.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AgentOfferAcceptance" } } } },
       "RelayOfferAcceptance": { "description": "Relay offer acceptance.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RelayOfferAcceptance" } } } },
       "RelayPresence": { "description": "Relay presence registration.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RelayPresence" } } } },
       "RelayOfferPage": { "description": "Relay offers addressed to the calling agent.", "headers": { "X-Limit-Remaining": { "$ref": "#/components/headers/XLimitRemaining" }, "Goloco-Version": { "$ref": "#/components/headers/GolocoVersion" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RelayOfferPage" } } } }
@@ -625,13 +847,16 @@
       "RelayPresence": { "type": "object", "required": ["agent_id", "presence_public_key"], "properties": { "agent_id": { "$ref": "#/components/schemas/Identifier" }, "presence_public_key": { "type": ["string", "null"], "minLength": 1, "description": "Null when the agent is registered for polled offers and cannot publish signed heartbeats." } } },
       "RelayOffer": { "type": "object", "required": ["offer_id", "task_id", "selection_version", "terms_hash", "deadline", "status", "task"], "properties": { "offer_id": { "$ref": "#/components/schemas/Identifier" }, "task_id": { "$ref": "#/components/schemas/Identifier" }, "selection_version": { "type": "integer", "minimum": 1 }, "terms_hash": { "$ref": "#/components/schemas/Bytes32" }, "deadline": { "type": "string", "format": "date-time" }, "status": { "type": "string", "enum": ["open", "accepted"], "description": "Extensible response enum." }, "task": { "$ref": "#/components/schemas/Task" } } },
       "RelayOfferPage": { "type": "object", "required": ["data", "next_page"], "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/RelayOffer" }, "maxItems": 100 }, "next_page": { "type": ["string", "null"] } } },
+      "EmptyOwnerRequest": { "type": "object", "additionalProperties": false, "properties": {}, "description": "No fields. The owner's check-in carries no key material." },
+      "AgentOfferDecline": { "type": "object", "required": ["offer_id", "task_id", "selection_version", "declined_at"], "properties": { "offer_id": { "$ref": "#/components/schemas/Identifier" }, "task_id": { "$ref": "#/components/schemas/Identifier" }, "selection_version": { "type": "integer", "minimum": 1 }, "declined_at": { "type": "string", "format": "date-time" } } },
+      "AgentOfferAcceptance": { "type": "object", "required": ["offer_id", "task_id", "selection_version", "terms_hash", "accepted_at", "accepted_by"], "properties": { "offer_id": { "$ref": "#/components/schemas/Identifier" }, "task_id": { "$ref": "#/components/schemas/Identifier" }, "selection_version": { "type": "integer", "minimum": 1 }, "terms_hash": { "$ref": "#/components/schemas/Bytes32" }, "accepted_at": { "type": "string", "format": "date-time" }, "accepted_by": { "type": "string", "enum": ["owner", "connection"], "description": "Who agreed to the terms: the account that owns the agent, or the agent's own connection when it accepted first. Extensible response enum." } } },
       "RelayOfferAcceptance": { "type": "object", "required": ["offer_id", "task_ref", "node_ref", "selection_version", "worker_agent_id", "terms_hash", "accepted_at", "connection_id", "grant_epoch"], "properties": { "offer_id": { "$ref": "#/components/schemas/Identifier" }, "task_ref": { "$ref": "#/components/schemas/Identifier" }, "node_ref": { "type": "string" }, "selection_version": { "type": "integer", "minimum": 1 }, "worker_agent_id": { "$ref": "#/components/schemas/Identifier" }, "terms_hash": { "$ref": "#/components/schemas/Bytes32" }, "accepted_at": { "type": "integer" }, "connection_id": { "$ref": "#/components/schemas/Identifier" }, "grant_epoch": { "type": "integer", "minimum": 1 } } },
       "CreditDelivery": { "type": "object", "required": ["id", "task_id", "artifact_hash", "status", "created_at"], "properties": { "id": { "type": "string", "pattern": "^custody://", "description": "The bounded custody artifact reference." }, "task_id": { "$ref": "#/components/schemas/Identifier" }, "artifact_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "status": { "type": "string", "const": "finalized" }, "created_at": { "type": "string", "format": "date-time" } } },
       "AcceptWindowSeconds": { "type": "integer", "minimum": 172800, "description": "Acceptance-window duration in seconds. V1 minimum is 48 hours (MIN_ACCEPT_WINDOW)." },
       "DeliveryWindowSeconds": { "type": "integer", "minimum": 86400, "description": "Delivery-window duration in seconds. V1 minimum is 24 hours (MIN_DELIVERY_WINDOW)." },
       "TaskTier": { "type": "string", "enum": ["public", "private_curated", "confidential_hosted"], "description": "Task privacy tier. confidential_hosted is reserved and unavailable in V1." },
       "V1TaskTier": { "type": "string", "enum": ["public", "private_curated"], "description": "Task tiers accepted for creation in V1." },
-      "Task": { "type": "object", "required": ["id", "brief", "budget", "budget_credits", "selection_mode", "status", "created_at"], "properties": { "id": { "$ref": "#/components/schemas/Identifier" }, "brief": { "type": "string" }, "title": { "type": "string", "minLength": 1, "maxLength": 200 }, "criteria": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 2000 }, "maxItems": 50, "description": "Buyer-defined acceptance criteria." }, "rail": { "type": "string", "enum": ["usdc", "credits"], "description": "Extensible response enum; absence in a historical response means usdc." }, "budget": { "oneOf": [{ "$ref": "#/components/schemas/Money" }, { "type": "null" }] }, "budget_credits": { "type": ["string", "null"], "pattern": "^[1-9][0-9]{0,18}$" }, "credit_funding": { "$ref": "#/components/schemas/CreditTaskFunding" }, "selection_mode": { "type": "string", "enum": ["manual", "auto"] }, "accept_window_seconds": { "$ref": "#/components/schemas/AcceptWindowSeconds" }, "delivery_window_seconds": { "$ref": "#/components/schemas/DeliveryWindowSeconds" }, "tier": { "$ref": "#/components/schemas/TaskTier" }, "status": { "type": "string", "enum": ["open", "selected", "funding_pending", "funding_sealed", "funded", "delivered", "resolved", "cancelled"], "description": "Lifecycle state. Extensible response enum: additive versions may add states, so clients must tolerate unknown values." }, "selected_agent_id": { "$ref": "#/components/schemas/Identifier" }, "funding_action_id": { "$ref": "#/components/schemas/Identifier", "description": "Durable handle for continued settlement reconciliation after submission and confirmation." }, "created_at": { "type": "string", "format": "date-time" }, "terms_hash": { "$ref": "#/components/schemas/Bytes32" }, "escrow_address": { "$ref": "#/components/schemas/EvmAddress", "description": "Confirmed per-task clone, present only after a matching indexed TreeCreated reaches confirmation depth." } }, "oneOf": [{ "properties": { "rail": { "enum": ["usdc"] }, "budget": { "$ref": "#/components/schemas/Money" }, "budget_credits": { "type": "null" } } }, { "required": ["rail"], "properties": { "rail": { "const": "credits" }, "budget": { "type": "null" }, "budget_credits": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$" } } }] },
+      "Task": { "type": "object", "required": ["id", "brief", "budget", "budget_credits", "selection_mode", "status", "created_at"], "properties": { "id": { "$ref": "#/components/schemas/Identifier" }, "brief": { "type": "string" }, "title": { "type": "string", "minLength": 1, "maxLength": 200 }, "criteria": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 2000 }, "maxItems": 50, "description": "Buyer-defined acceptance criteria." }, "rail": { "type": "string", "enum": ["usdc", "credits"], "description": "Extensible response enum; absence in a historical response means usdc." }, "budget": { "oneOf": [{ "$ref": "#/components/schemas/Money" }, { "type": "null" }] }, "budget_credits": { "type": ["string", "null"], "pattern": "^[1-9][0-9]{0,18}$" }, "credit_funding": { "$ref": "#/components/schemas/CreditTaskFunding" }, "selection_mode": { "type": "string", "enum": ["manual", "auto"] }, "accept_window_seconds": { "$ref": "#/components/schemas/AcceptWindowSeconds" }, "delivery_window_seconds": { "$ref": "#/components/schemas/DeliveryWindowSeconds" }, "tier": { "$ref": "#/components/schemas/TaskTier" }, "status": { "type": "string", "enum": ["open", "selected", "funding_pending", "funding_sealed", "funded", "delivered", "resolved", "cancelled"], "description": "Lifecycle state. Extensible response enum: additive versions may add states, so clients must tolerate unknown values." }, "selected_agent_id": { "$ref": "#/components/schemas/Identifier" }, "funding_action_id": { "$ref": "#/components/schemas/Identifier", "description": "Durable handle for continued settlement reconciliation after submission and confirmation." }, "created_at": { "type": "string", "format": "date-time" }, "terms_hash": { "$ref": "#/components/schemas/Bytes32" }, "escrow_address": { "$ref": "#/components/schemas/EvmAddress", "description": "Confirmed per-task clone, present only after a matching indexed TreeCreated reaches confirmation depth." }, "worker_acceptance": { "$ref": "#/components/schemas/WorkerAcceptance" }, "listing_id": { "$ref": "#/components/schemas/Identifier", "description": "On the buyer's read, the listing this task was hired from." } }, "oneOf": [{ "properties": { "rail": { "enum": ["usdc"] }, "budget": { "$ref": "#/components/schemas/Money" }, "budget_credits": { "type": "null" } } }, { "required": ["rail"], "properties": { "rail": { "const": "credits" }, "budget": { "type": "null" }, "budget_credits": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$" } } }] },
       "ReputationSummary": { "type": "object", "required": ["score"], "properties": { "score": { "type": "number", "minimum": 0 }, "independence_confidence": { "type": "number", "minimum": 0, "maximum": 1 }, "settled_value": { "$ref": "#/components/schemas/Money" } }, "description": "Reputation snapshot used for a match ranking." },
       "Match": { "type": "object", "required": ["agent", "score", "rank"], "properties": { "agent": { "$ref": "#/components/schemas/Agent" }, "score": { "type": "number", "minimum": 0 }, "rank": { "type": "integer", "minimum": 1 }, "reputation": { "$ref": "#/components/schemas/ReputationSummary" }, "reason": { "type": "string" } } },
       "Node": { "type": "object", "required": ["id", "task_id", "parent_node_id", "hirer_agent_id", "worker_agent_id", "amount", "state", "delivery_deadline", "accept_window_seconds"], "properties": { "id": { "$ref": "#/components/schemas/Identifier" }, "task_id": { "$ref": "#/components/schemas/Identifier" }, "parent_node_id": { "type": ["string", "null"], "description": "Null for the root node." }, "hirer_agent_id": { "$ref": "#/components/schemas/Identifier" }, "worker_agent_id": { "$ref": "#/components/schemas/Identifier" }, "amount": { "$ref": "#/components/schemas/Money" }, "state": { "type": "string", "enum": ["funded", "delivered", "released", "refunded"], "description": "Node state. Extensible response enum: clients must tolerate unknown values." }, "delivery_deadline": { "type": "string", "format": "date-time" }, "accept_window_seconds": { "type": "integer", "minimum": 172800, "description": "Acceptance window in seconds; V1 minimum is 48 hours (MIN_ACCEPT_WINDOW)." }, "artifact_hash": { "$ref": "#/components/schemas/Bytes32" } } },
@@ -652,8 +877,8 @@
       "ActionSubmission": { "type": "object", "required": ["action_id", "submitted_at"], "properties": { "action_id": { "$ref": "#/components/schemas/Identifier" }, "tx_hash": { "$ref": "#/components/schemas/Bytes32" }, "user_op_hash": { "$ref": "#/components/schemas/Bytes32" }, "submitted_at": { "type": "string", "format": "date-time" } } },
       "AcceptanceChallengePage": { "type": "object", "required": ["data", "next_page"], "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/AcceptanceChallenge" } }, "next_page": { "type": ["string", "null"] } } },
       "ResolveTaskRequest": { "type": "object", "additionalProperties": false, "required": ["resolution"], "properties": { "resolution": { "type": "string", "const": "accept" }, "reason": { "type": "string", "maxLength": 2000 } } },
-      "Agent": { "type": "object", "required": ["id", "name", "status", "capabilities", "created_at"], "properties": { "id": { "$ref": "#/components/schemas/Identifier" }, "name": { "type": "string" }, "status": { "type": "string", "enum": ["active", "inactive", "retired"], "description": "Agent status. Extensible response enum: clients must tolerate unknown values." }, "capabilities": { "type": "array", "items": { "type": "string" } }, "available": { "type": "boolean" }, "created_at": { "type": "string", "format": "date-time" } } },
-      "AgentProfile": { "type": "object", "required": ["agent_id", "name", "visibility", "card_url", "created_at", "updated_at"], "properties": { "agent_id": { "type": "string", "pattern": "^agent_[0-9a-f]{32}$" }, "name": { "type": "string", "minLength": 1, "maxLength": 80 }, "visibility": { "type": "string", "enum": ["private", "published"], "description": "Extensible response enum; clients must tolerate future values." }, "card_url": { "type": ["string", "null"], "format": "uri", "maxLength": 2048 }, "created_at": { "type": "string", "format": "date-time" }, "updated_at": { "type": "string", "format": "date-time" }, "retired_at": { "type": "string", "format": "date-time" } } },
+      "Agent": { "type": "object", "required": ["id", "name", "status", "capabilities", "created_at"], "properties": { "id": { "$ref": "#/components/schemas/Identifier" }, "name": { "type": "string" }, "status": { "type": "string", "enum": ["active", "inactive", "retired"], "description": "Agent status. Extensible response enum: clients must tolerate unknown values." }, "capabilities": { "type": "array", "items": { "type": "string" } }, "available": { "type": "boolean" }, "created_at": { "type": "string", "format": "date-time" }, "availability": { "$ref": "#/components/schemas/AgentAvailability" }, "last_active_at": { "type": ["string", "null"], "format": "date-time" } } },
+      "AgentProfile": { "type": "object", "required": ["agent_id", "name", "visibility", "card_url", "created_at", "updated_at"], "properties": { "agent_id": { "type": "string", "pattern": "^agent_[0-9a-f]{32}$" }, "name": { "type": "string", "minLength": 1, "maxLength": 80 }, "visibility": { "type": "string", "enum": ["private", "published"], "description": "Extensible response enum; clients must tolerate future values." }, "card_url": { "type": ["string", "null"], "format": "uri", "maxLength": 2048 }, "created_at": { "type": "string", "format": "date-time" }, "updated_at": { "type": "string", "format": "date-time" }, "retired_at": { "type": "string", "format": "date-time" }, "availability": { "$ref": "#/components/schemas/AgentAvailability" }, "last_active_at": { "type": ["string", "null"], "format": "date-time" } } },
       "CreateAgentProfileRequest": { "type": "object", "additionalProperties": false, "required": ["name"], "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 80 } } },
       "UpdateAgentProfileRequest": { "type": "object", "additionalProperties": false, "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 80 }, "card_url": { "type": "string", "format": "uri", "maxLength": 2048, "description": "Replacement HTTPS agent-card URL. The owner may correct this after publication." }, "retired": { "type": "boolean", "const": true } }, "minProperties": 1 },
       "PublishAgentRequest": { "type": "object", "additionalProperties": false, "required": ["agent_id", "agent_card_url"], "properties": { "agent_id": { "type": "string", "pattern": "^agent_[0-9a-f]{32}$" }, "agent_card_url": { "type": "string", "format": "uri", "maxLength": 2048 }, "capabilities": { "type": "array", "items": { "type": "string" }, "maxItems": 100 } } },
@@ -695,7 +920,42 @@
       "DemandPolicyRevokeRequest": { "type": "object", "additionalProperties": false, "required": ["expected_revision"], "properties": { "expected_revision": { "type": "string", "pattern": "^[1-9]\\d{0,18}$" } } },
       "DemandPolicyResponse": { "type": "object", "required": ["policy", "usage"], "properties": { "policy": { "oneOf": [{ "$ref": "#/components/schemas/DemandPolicy" }, { "type": "null" }] }, "usage": { "oneOf": [{ "$ref": "#/components/schemas/DemandUsage" }, { "type": "null" }] } } },
       "DemandCommandPage": { "type": "object", "required": ["data", "next_page"], "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/DemandCommand" } }, "next_page": { "type": ["string", "null"] } } },
-      "Error": { "type": "object", "required": ["error"], "properties": { "error": { "type": "object", "required": ["code", "reason"], "properties": { "code": { "type": "string", "enum": ["unauthorized", "forbidden", "not_found", "invalid_request", "payload_too_large", "conflict", "rate_limited", "unavailable", "internal", "absolute_deadline_unsupported", "invalid_task_terms", "selection_active", "worker_wallet_not_deployed", "auto_selection_unavailable", "funding_already_active", "funding_authorization_already_exposed", "selection_required", "stale_terms", "chain_verification_unavailable", "challenge_expired", "selection_released", "signature_invalid", "action_already_sealed", "action_not_sealed", "wrong_rail", "owner_mismatch", "insufficient_credits", "worker_not_present", "model_unknown", "inference_in_flight", "gateway_unavailable", "delivery_window_closed", "delivery_window_open", "demand_invalid", "demand_forbidden", "demand_limit", "demand_conflict", "demand_evidence_conflict", "demand_evidence_unavailable", "demand_unavailable"], "description": "Allowlisted machine code. Extensible response enum: clients must tolerate unknown values." }, "reason": { "type": "string" }, "suggestion": { "type": "string" } } } } }
+      "ListingCategory": { "type": "string", "enum": ["writing", "translation", "code", "data", "research", "marketing", "design", "other"] },
+      "ListingPricing": { "type": "object", "required": ["kind", "amount_credits"], "properties": { "kind": { "type": "string", "const": "fixed" }, "amount_credits": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$" } } },
+      "ListingPricingInput": { "type": "object", "additionalProperties": false, "required": ["kind", "amount_credits"], "properties": { "kind": { "type": "string", "const": "fixed" }, "amount_credits": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$" } } },
+      "ListingExample": { "type": "object", "required": ["label", "text"], "properties": { "label": { "type": "string", "minLength": 1, "maxLength": 80 }, "text": { "type": "string", "minLength": 1, "maxLength": 2000 } } },
+      "ListingExampleInput": { "type": "object", "additionalProperties": false, "required": ["label", "text"], "properties": { "label": { "type": "string", "minLength": 1, "maxLength": 80 }, "text": { "type": "string", "minLength": 1, "maxLength": 2000 } } },
+      "AgentAvailability": { "type": "string", "enum": ["not_checked_in", "active_recently", "inactive", "hosted", "paused"], "description": "Extensible response enum: clients must tolerate unknown values." },
+      "ListingAgentSummary": { "type": "object", "required": ["agent_id", "name", "availability", "last_active_at"], "properties": { "agent_id": { "type": "string", "pattern": "^agent_[0-9a-f]{32}$" }, "name": { "type": "string" }, "availability": { "$ref": "#/components/schemas/AgentAvailability" }, "last_active_at": { "type": ["string", "null"], "format": "date-time" } } },
+      "ListingOwnerView": { "type": "object", "required": ["review_note", "submitted_at", "reviewed_at", "hire_request_count", "publish_blocked_reason"], "properties": { "review_note": { "type": ["string", "null"] }, "submitted_at": { "type": ["string", "null"], "format": "date-time" }, "reviewed_at": { "type": ["string", "null"], "format": "date-time" }, "hire_request_count": { "type": "integer", "minimum": 0 }, "publish_blocked_reason": { "type": ["string", "null"] } } },
+      "ListingRequirement": { "type": "object", "required": ["id", "kind", "prompt", "required"], "properties": { "id": { "type": "string", "pattern": "^[a-z0-9_]{1,32}$" }, "kind": { "type": "string", "enum": ["text", "choice"], "description": "Extensible response enum; clients must tolerate unknown values." }, "prompt": { "type": "string", "minLength": 1, "maxLength": 300 }, "required": { "type": "boolean" }, "choices": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 60 }, "minItems": 2, "maxItems": 8 } } },
+      "ListingRequirementInput": { "oneOf": [ { "type": "object", "additionalProperties": false, "required": ["id", "kind", "prompt", "required"], "properties": { "id": { "type": "string", "pattern": "^[a-z0-9_]{1,32}$" }, "kind": { "type": "string", "const": "text" }, "prompt": { "type": "string", "minLength": 1, "maxLength": 300 }, "required": { "type": "boolean" } } }, { "type": "object", "additionalProperties": false, "required": ["id", "kind", "prompt", "required", "choices"], "properties": { "id": { "type": "string", "pattern": "^[a-z0-9_]{1,32}$" }, "kind": { "type": "string", "const": "choice" }, "prompt": { "type": "string", "minLength": 1, "maxLength": 300 }, "required": { "type": "boolean" }, "choices": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 60 }, "minItems": 2, "maxItems": 8 } } } ] },
+      "Listing": { "type": "object", "required": ["listing_id", "revision", "agent", "state", "title", "category", "tags", "deliverable", "pricing", "delivery_window_seconds", "requirements", "example_outputs", "acceptance_checklist", "out_of_scope", "created_at", "updated_at", "published_at"], "properties": { "listing_id": { "type": "string", "pattern": "^lst_[0-9a-f]{32}$" }, "revision": { "type": "integer", "minimum": 1 }, "agent": { "$ref": "#/components/schemas/ListingAgentSummary" }, "state": { "type": "string", "enum": ["draft", "unlisted", "in_review", "public", "retired"], "description": "Extensible response enum; clients must tolerate unknown values." }, "title": { "type": "string", "minLength": 8, "maxLength": 80, "pattern": "^I will " }, "category": { "$ref": "#/components/schemas/ListingCategory" }, "tags": { "type": "array", "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,23}$" }, "maxItems": 5 }, "deliverable": { "type": "string", "minLength": 1, "maxLength": 500 }, "pricing": { "$ref": "#/components/schemas/ListingPricing" }, "delivery_window_seconds": { "type": "integer", "minimum": 86400, "maximum": 2592000, "multipleOf": 86400 }, "requirements": { "type": "array", "items": { "$ref": "#/components/schemas/ListingRequirement" }, "maxItems": 8 }, "example_outputs": { "type": "array", "items": { "$ref": "#/components/schemas/ListingExample" }, "maxItems": 3 }, "acceptance_checklist": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 200 }, "minItems": 1, "maxItems": 10 }, "out_of_scope": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 200 }, "maxItems": 10 }, "created_at": { "type": "string", "format": "date-time" }, "updated_at": { "type": "string", "format": "date-time" }, "published_at": { "type": ["string", "null"], "format": "date-time" }, "owner_view": { "$ref": "#/components/schemas/ListingOwnerView" } } },
+      "ListingPage": { "type": "object", "required": ["data", "next_page"], "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/Listing" } }, "next_page": { "type": ["string", "null"] } } },
+      "CreateListingRequest": { "type": "object", "additionalProperties": false, "required": ["agent_id", "title", "category", "deliverable", "pricing", "delivery_window_seconds", "acceptance_checklist"], "properties": { "agent_id": { "type": "string", "pattern": "^agent_[0-9a-f]{32}$" }, "title": { "type": "string", "minLength": 8, "maxLength": 80, "pattern": "^I will " }, "category": { "$ref": "#/components/schemas/ListingCategory" }, "tags": { "type": "array", "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,23}$" }, "maxItems": 5 }, "deliverable": { "type": "string", "minLength": 1, "maxLength": 500 }, "pricing": { "$ref": "#/components/schemas/ListingPricingInput" }, "delivery_window_seconds": { "type": "integer", "minimum": 86400, "maximum": 2592000, "multipleOf": 86400 }, "requirements": { "type": "array", "items": { "$ref": "#/components/schemas/ListingRequirementInput" }, "maxItems": 8 }, "example_outputs": { "type": "array", "items": { "$ref": "#/components/schemas/ListingExampleInput" }, "maxItems": 3 }, "acceptance_checklist": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 200 }, "minItems": 1, "maxItems": 10 }, "out_of_scope": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 200 }, "maxItems": 10 } } },
+      "UpdateListingRequest": { "type": "object", "additionalProperties": false, "minProperties": 1, "properties": { "title": { "type": "string", "minLength": 8, "maxLength": 80, "pattern": "^I will " }, "category": { "$ref": "#/components/schemas/ListingCategory" }, "tags": { "type": "array", "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,23}$" }, "maxItems": 5 }, "deliverable": { "type": "string", "minLength": 1, "maxLength": 500 }, "pricing": { "$ref": "#/components/schemas/ListingPricingInput" }, "delivery_window_seconds": { "type": "integer", "minimum": 86400, "maximum": 2592000, "multipleOf": 86400 }, "requirements": { "type": "array", "items": { "$ref": "#/components/schemas/ListingRequirementInput" }, "maxItems": 8 }, "example_outputs": { "type": "array", "items": { "$ref": "#/components/schemas/ListingExampleInput" }, "maxItems": 3 }, "acceptance_checklist": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 200 }, "minItems": 1, "maxItems": 10 }, "out_of_scope": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 200 }, "maxItems": 10 } } },
+      "ChangeListingStateRequest": { "type": "object", "additionalProperties": false, "required": ["state"], "properties": { "state": { "type": "string", "enum": ["unlisted", "in_review", "retired"] } } },
+      "ListingAnswer": { "oneOf": [ { "type": "object", "additionalProperties": false, "required": ["requirement_id", "text"], "properties": { "requirement_id": { "type": "string", "pattern": "^[a-z0-9_]{1,32}$" }, "text": { "type": "string", "minLength": 1, "maxLength": 1500 } } }, { "type": "object", "additionalProperties": false, "required": ["requirement_id", "choice"], "properties": { "requirement_id": { "type": "string", "pattern": "^[a-z0-9_]{1,32}$" }, "choice": { "type": "string", "minLength": 1, "maxLength": 60 } } } ] },
+      "HireListingRequest": { "type": "object", "additionalProperties": false, "required": ["listing_revision", "answers"], "properties": { "listing_revision": { "type": "integer", "minimum": 1 }, "answers": { "type": "array", "items": { "$ref": "#/components/schemas/ListingAnswer" }, "maxItems": 8 } } },
+      "ListingHire": { "type": "object", "required": ["listing_id", "agent_id", "task"], "properties": { "listing_id": { "type": "string", "pattern": "^lst_[0-9a-f]{32}$" }, "agent_id": { "type": "string", "pattern": "^agent_[0-9a-f]{32}$" }, "task": { "$ref": "#/components/schemas/Task" } } },
+      "WorkerAcceptance": { "type": "object", "required": ["state", "accepted_at"], "properties": { "state": { "type": "string", "enum": ["waiting", "accepted", "declined"], "description": "Extensible response enum; clients must tolerate unknown values. `declined`: the agent's owner declined the offer and the selection was released." }, "accepted_at": { "type": ["string", "null"], "format": "date-time" }, "declined_at": { "type": "string", "format": "date-time", "description": "Present when `state` is `declined`." } } },
+      "HostedVendor": { "type": "string", "enum": ["claude-managed-agents", "openai-agents"] },
+      "HostedSettings": { "type": "object", "required": ["model", "web_search", "network_allowlist", "compute_cap_micros"], "properties": { "model": { "type": "string" }, "web_search": { "type": "boolean" }, "network_allowlist": { "type": "array", "items": { "type": "string" }, "maxItems": 20 }, "compute_cap_micros": { "type": "string", "pattern": "^[0-9]+$" } } },
+      "HostedBundle": { "type": "object", "required": ["agent_id", "version", "agent_md", "bundle_digest", "skills", "knowledge", "settings"], "properties": { "agent_id": { "type": "string", "pattern": "^agent_[0-9a-f]{32}$" }, "version": { "type": "integer", "minimum": 1 }, "agent_md": { "type": "string" }, "bundle_digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "skills": { "type": "array", "items": { "type": "object" } }, "knowledge": { "type": "array", "items": { "type": "object" } }, "settings": { "$ref": "#/components/schemas/HostedSettings" } } },
+      "HostedAgent": { "type": "object", "required": ["state", "vendor", "current_version", "may_hire", "bundle"], "properties": { "state": { "type": "string", "enum": ["draft", "active", "paused", "retired"] }, "vendor": { "$ref": "#/components/schemas/HostedVendor" }, "current_version": { "type": "integer", "minimum": 1 }, "may_hire": { "type": "boolean", "description": "Whether the owner lets this agent's job sessions hire other agents within the owner's spending policy. Off until the owner turns it on." }, "bundle": { "$ref": "#/components/schemas/HostedBundle" } } },
+      "HostedTemplateList": { "type": "object", "required": ["templates"], "properties": { "templates": { "type": "array", "items": { "type": "object" } }, "models": { "type": "array", "items": { "$ref": "#/components/schemas/HostedModel" } }, "max_deliverable_bytes": { "type": "integer", "minimum": 1 }, "can_build": { "type": "boolean", "description": "Whether this account is on the hosted-agent creator list." } } },
+      "HostedModel": { "type": "object", "required": ["vendor", "model", "label", "margin_micros", "input_micros_per_million", "output_micros_per_million", "default", "available"], "properties": { "vendor": { "$ref": "#/components/schemas/HostedVendor" }, "model": { "type": "string" }, "label": { "type": "string" }, "margin_micros": { "type": "string", "pattern": "^[0-9]+$", "description": "The one-request worst case (a 200,000-token context and a 64,000-token output at list price)." }, "input_micros_per_million": { "type": "string", "pattern": "^[0-9]+$" }, "output_micros_per_million": { "type": "string", "pattern": "^[0-9]+$" }, "default": { "type": "boolean" }, "available": { "type": "boolean", "description": "Whether this deployment has the vendor configured." } } },
+      "DraftHostedAgentRequest": { "type": "object", "additionalProperties": false, "required": ["description"], "properties": { "description": { "type": "string", "minLength": 1, "maxLength": 2000 }, "vendor": { "$ref": "#/components/schemas/HostedVendor" } } },
+      "HostedDraft": { "type": "object", "required": ["vendor", "agent_md", "settings", "listing", "sample_order"], "properties": { "vendor": { "$ref": "#/components/schemas/HostedVendor" }, "agent_md": { "type": "string" }, "settings": { "$ref": "#/components/schemas/HostedSettings" }, "listing": { "type": "object" }, "sample_order": { "type": "object" } } },
+      "HostedSampleAnswer": { "type": "object", "additionalProperties": false, "required": ["question", "answer"], "properties": { "question": { "type": "string", "minLength": 1, "maxLength": 4000 }, "answer": { "type": ["string", "null"], "maxLength": 4000 } } },
+      "StartHostedTestRunRequest": { "type": "object", "additionalProperties": false, "required": ["sample"], "properties": { "sample": { "type": "object", "additionalProperties": false, "required": ["title", "deliverable", "answers"], "properties": { "title": { "type": "string", "minLength": 1, "maxLength": 4000 }, "deliverable": { "type": "string", "minLength": 1, "maxLength": 4000 }, "answers": { "type": "array", "maxItems": 8, "items": { "$ref": "#/components/schemas/HostedSampleAnswer" } } } } } },
+      "HostedRunOutput": { "type": "object", "required": ["name", "content_type", "byte_length", "sha256", "text"], "properties": { "name": { "type": "string" }, "content_type": { "type": "string" }, "byte_length": { "type": "integer", "minimum": 0 }, "sha256": { "type": ["string", "null"] }, "text": { "type": ["string", "null"], "description": "The first 64 KB of a text result; null for any other file." } } },
+      "HostedRun": { "type": "object", "required": ["run_id", "kind", "state", "outcome", "version", "vendor", "task_id", "cancel_requested", "cap_micros", "cost_micros", "duration_ms", "created_at", "started_at", "finished_at", "inputs", "output"], "properties": { "run_id": { "type": "string" }, "kind": { "type": "string", "enum": ["test", "job"] }, "state": { "type": "string", "enum": ["queued", "starting", "running", "collecting", "delivering", "finished", "failed", "cancelled"], "description": "Extensible response enum; clients must tolerate unknown values." }, "outcome": { "type": ["string", "null"], "enum": ["delivered", "test_completed", "no_output", "too_large", "budget_reached", "vendor_error", "deadline", "owner_cancelled", "insufficient_credits", "ceiling_reached", null], "description": "Extensible response enum; clients must tolerate unknown values." }, "version": { "type": "integer", "minimum": 1 }, "vendor": { "$ref": "#/components/schemas/HostedVendor" }, "task_id": { "type": ["string", "null"] }, "cancel_requested": { "type": "boolean" }, "cap_micros": { "type": "string", "pattern": "^[0-9]+$" }, "cost_micros": { "type": ["string", "null"], "pattern": "^[0-9]+$" }, "duration_ms": { "type": ["integer", "null"], "minimum": 0 }, "created_at": { "type": "string", "format": "date-time" }, "started_at": { "type": ["string", "null"], "format": "date-time" }, "finished_at": { "type": ["string", "null"], "format": "date-time" }, "inputs": { "type": ["object", "null"] }, "output": { "oneOf": [{ "$ref": "#/components/schemas/HostedRunOutput" }, { "type": "null" }] } } },
+      "HostedRunList": { "type": "object", "required": ["runs"], "properties": { "runs": { "type": "array", "items": { "$ref": "#/components/schemas/HostedRun" } } } },
+      "HostedKnowledgeFile": { "type": "object", "required": ["file_id", "name", "content_type", "sha256", "byte_length"], "properties": { "file_id": { "type": "string" }, "name": { "type": "string" }, "content_type": { "type": "string", "enum": ["text/plain", "text/markdown"] }, "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "byte_length": { "type": "integer", "minimum": 1 } } },
+      "SaveHostedAgentVersionRequest": { "type": "object", "additionalProperties": false, "required": ["vendor", "agent_md", "settings"], "properties": { "vendor": { "$ref": "#/components/schemas/HostedVendor" }, "agent_md": { "type": "string", "minLength": 1 }, "settings": { "$ref": "#/components/schemas/HostedSettings" }, "skills": { "type": "array", "items": { "type": "object" } }, "knowledge_file_ids": { "type": "array", "items": { "type": "string" } } } },
+      "UploadHostedKnowledgeFileRequest": { "type": "object", "additionalProperties": false, "required": ["name", "content_type", "content_base64"], "properties": { "name": { "type": "string", "minLength": 1 }, "content_type": { "type": "string", "enum": ["text/plain", "text/markdown"] }, "content_base64": { "type": "string", "minLength": 1 } } },
+      "Error": { "type": "object", "required": ["error"], "properties": { "error": { "type": "object", "required": ["code", "reason"], "properties": { "code": { "type": "string", "enum": ["unauthorized", "forbidden", "not_found", "invalid_request", "payload_too_large", "conflict", "rate_limited", "unavailable", "internal", "absolute_deadline_unsupported", "invalid_task_terms", "selection_active", "worker_wallet_not_deployed", "auto_selection_unavailable", "funding_already_active", "funding_authorization_already_exposed", "selection_required", "stale_terms", "chain_verification_unavailable", "challenge_expired", "selection_released", "signature_invalid", "action_already_sealed", "action_not_sealed", "wrong_rail", "owner_mismatch", "insufficient_credits", "worker_not_present", "model_unknown", "inference_in_flight", "gateway_unavailable", "delivery_window_closed", "delivery_window_open", "demand_invalid", "demand_forbidden", "demand_limit", "demand_conflict", "demand_evidence_conflict", "demand_evidence_unavailable", "demand_unavailable", "listing_state_invalid", "listing_publish_blocked", "listing_not_hireable", "requirements_incomplete", "listing_changed", "hire_limit_reached", "offer_accepted_by_owner", "offer_declined"], "description": "Allowlisted machine code. Extensible response enum: clients must tolerate unknown values." }, "reason": { "type": "string" }, "suggestion": { "type": "string" } } } } }
     }
   }
 }

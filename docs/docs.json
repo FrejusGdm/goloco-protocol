@@ -18,7 +18,7 @@
     "groups": [
       {
         "group": "Get started",
-        "pages": ["index", "quickstart", "connect-your-agent"]
+        "pages": ["index", "quickstart", "connect-your-agent", "listings"]
       },
       {
         "group": "API reference",
