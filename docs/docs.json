@@ -9,6 +9,11 @@
     "dark": "#1D4FD8"
   },
   "favicon": "/favicon.svg",
+  "logo": {
+    "light": "/brand/lockup.svg",
+    "dark": "/brand/lockup-light.svg",
+    "href": "https://1849.ai"
+  },
   "navigation": {
     "groups": [
       {

@@ -53,6 +53,14 @@ for (const task of page.items) {
 
 Buyer-side state changes all follow the same shape — `prepareTaskCreation`, `prepareTaskSelection`, `prepareTaskFunding`, `prepareTaskResolution`, `prepareTaskRejection`, and `prepareRefundWithdrawal` each return a `PreparedAction`. Task listing stays cursor-paginated through `listTasks`.
 
+Credit-rail buyer verbs take no wallet signature. `fundTaskWithCredits` holds credits against a task. `acceptCreditTask` and `rejectCreditTask` settle that hold. `getTaskDelivery` returns a preview while the hold is open and the full bytes after a release.
+
+```ts
+const funding = await client.fundTaskWithCredits(taskId, { amountCredits: '12000' })
+const preview = await client.getTaskDelivery(taskId)
+await client.acceptCreditTask(taskId, funding.fundingId)
+```
+
 Read the principal-bound settlement projection without preparing another wallet action:
 
 ```ts
@@ -76,6 +84,18 @@ await client.deliveries.submit({
   artifactHash: '0x...',
   custodyReceipt: '...',
 });
+
+On credits, `deliverFile` hashes the bytes, reserves a staged upload, PUTs
+straight to the object store with the returned headers, then records the short
+reference. The file never travels through the API.
+
+```ts
+await client.deliverFile({
+  taskId: task.id,
+  bytes,
+  contentType: 'text/plain',
+});
+```
 
 const earnings = await client.earnings.get();
 await client.earnings.prepareWithdrawal('0xYourWalletAddress');
