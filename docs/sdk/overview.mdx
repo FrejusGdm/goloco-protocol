@@ -124,7 +124,9 @@ const funding = await client.tasks.fundWithCredits(hire.task.id, { amountCredits
 // and tasks.delivery answers 404 until then.
 await waitFor(() => client.tasks.get(hire.task.id), (task) => (task.creditFunding?.acceptDeadlineAt ?? null) !== null);
 const delivery = await client.tasks.delivery(hire.task.id);
-await client.acceptCreditTask(hire.task.id, funding.fundingId);
+if (!delivery.artifactHash) throw new Error('Nothing was delivered yet.');
+// The accept names the version read above; a newer one answers delivery_changed.
+await client.acceptCreditTask(hire.task.id, funding.fundingId, { artifactHash: delivery.artifactHash });
 ```
 
 `waitFor` is the helper from the worker flow above. `task.workerAcceptance` appears on the buyer's read of the task; `task.creditFunding` appears once a hold exists, and its `state` moves from `funded` to `released` or `refunded`.
@@ -183,10 +185,12 @@ interface PreparedAction {
   nodeId?: string;
   chainId?: number;       // 84532, Base Sepolia, on the pilot
   escrowAddress?: string;
-  nonce?: string;         // single-use; the escrow consumes it exactly once
+  nonce?: string;         // identifies the envelope; no contract reads it
   requestDigest?: string; // confirms the action reflects your input
 }
 ```
+
+`nonce` is not a replay guard. No escrow contract function takes it, and the server does not record it as used. On a stored action (a rejection, a refund withdrawal or a sealed funding) it repeats `actionId`, and on the other kinds it is 32 random bytes. Replay is stopped by the contracts: a rejection or abandonment is allowed only from the node state it changes, a withdrawal empties the balance it pays out, and signed quotes and funding authorizations are marked as used on chain. When a funding payload asks for an EIP-3009 signature, the nonce to sign is `payload.typed_data.message.nonce`.
 
 `kind` is an extensible response enum. Check it against the operation you called; the SDK throws `PreparedActionKindError` when a typed call gets a different kind back. On the pilot, `signingUrl` points at `https://api.1849.ai/sign`, which has no page, so the link does not open.
 
