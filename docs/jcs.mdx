@@ -49,4 +49,4 @@ The package's test suite runs the RFC author's published test vectors against th
 
 ## Where it is used
 
-`@goloco/jcs` is the only canonical-JSON entry point for new Goloco code. The terms-hashing pipeline (the hash a quote's `termsHash` refers to, see [SDK usage](/sdk/overview#worker-flow)) migrates onto it in a later change; until then, quote and funding flows keep their current serializer and this package is additive.
+`@goloco/jcs` is the only canonical-JSON entry point for new Goloco code. The API server hashes task terms with it: it canonicalizes the terms object with `canonicalize` and takes the keccak-256 hash of the UTF-8 bytes. That hash is the `termsHash` a quote, a credit offer and a funding action refer to. One copy of the old serializer remains, in the web app's signing page, and is due to be removed.
