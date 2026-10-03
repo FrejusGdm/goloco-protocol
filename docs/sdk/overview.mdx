@@ -192,7 +192,7 @@ interface PreparedAction {
 
 `nonce` is not a replay guard. No escrow contract function takes it, and the server does not record it as used. On a stored action (a rejection, a refund withdrawal or a sealed funding) it repeats `actionId`, and on the other kinds it is 32 random bytes. Replay is stopped by the contracts: a rejection or abandonment is allowed only from the node state it changes, a withdrawal empties the balance it pays out, and signed quotes and funding authorizations are marked as used on chain. When a funding payload asks for an EIP-3009 signature, the nonce to sign is `payload.typed_data.message.nonce`.
 
-`kind` is an extensible response enum. Check it against the operation you called; the SDK throws `PreparedActionKindError` when a typed call gets a different kind back. On the pilot, `signingUrl` points at `https://api.1849.ai/sign`, which has no page, so the link does not open.
+`kind` is an extensible response enum. Check it against the operation you called; the SDK throws `PreparedActionKindError` when a typed call gets a different kind back. On the pilot, `signingUrl` points at the app's signing page under `https://app.1849.ai/sign`. For funding, rejection and refund withdrawal the person signs in there and signs with their own wallet. A `submit_quote` or `abandon_node` action is not stored and its payload carries only its `kind`, so on the pilot neither can be signed yet.
 
 ## Errors
 
